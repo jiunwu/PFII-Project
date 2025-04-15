@@ -194,8 +194,10 @@ Planned enhancements for future versions include:
 
 ## Credits
 
-Developed by [Your Name/Organization]
+Developed by USI Students (https://usi.ch): Jiun-Yi Wu Greta Fumi Eray Akyol
+
+
 
 ## License
 
-[License Information]
+MIT

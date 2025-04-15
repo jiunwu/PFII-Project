@@ -1,5 +1,5 @@
 // content.js - Content script for Lifetime Cost Calculator Extension
-
+console.log('Lifetime Cost Calculator: Content script loaded');
 // Main function to initialize the content script
 function initLifetimeCostCalculator() {
   console.log('Lifetime Cost Calculator: Content script initialized');
@@ -43,13 +43,21 @@ function initLifetimeCostCalculator() {
 function isProductPage() {
   // Check URL pattern
   if (!window.location.href.includes('/product/')) {
+    console.log('Not a product page based on URL');
     return false;
   }
   
   // Check for product-specific elements
-  const productTitleElement = document.querySelector('.product-title, .product-name, h1.name');
-  const priceElement = document.querySelector('.price, .product-price, .price-tag');
-  
+  const productTitleElement = document.querySelector('h1.sc-d571b66f-0.dScdZY').textContent.trim();
+  console.log('Product title element:', productTitleElement);
+
+  const priceElement = document.querySelector('span.sc-d571b66f-0.jdXyHs').textContent.trim().replace(/[^0-9,]/g, '').replace(',', '.');
+  console.log('Price element:', priceElement);
+
+  if (!productTitleElement || !priceElement) {
+    console.log('Product title or price element not found');
+    return false;
+  }
   return productTitleElement && priceElement;
 }
 
@@ -60,10 +68,8 @@ function extractProductData() {
     // The actual implementation will need to be adapted based on the specific structure of saturn.de
     
     // Extract product name
-    const productName = document.querySelector('.product-title, .product-name, h1.name')?.textContent.trim();
-    
-    // Extract price
-    const priceText = document.querySelector('.price, .product-price, .price-tag')?.textContent.trim();
+    const productName = document.querySelector('h1.sc-d571b66f-0.dScdZY').textContent.trim();
+    const priceText = document.querySelector('span.sc-d571b66f-0.jdXyHs').textContent.trim().replace(/[^0-9,]/g, '').replace(',', '.');
     const price = parsePrice(priceText);
     
     // Extract energy information

@@ -1,0 +1,42 @@
+# Chrome Extension - Product Lifetime Cost Calculator
+
+## Todo List
+
+- [x] Create project structure
+- [ ] Research Chrome extension basics
+  - [ ] Manifest structure
+  - [ ] Content scripts
+  - [ ] Background scripts
+  - [ ] Browser APIs
+  - [ ] Extension permissions
+- [ ] Research product lifetime cost calculation methods
+  - [ ] Energy consumption calculation
+  - [ ] Maintenance costs
+  - [ ] Depreciation
+  - [ ] Operational costs
+- [ ] Design extension architecture
+  - [ ] Component diagram
+  - [ ] Data flow
+  - [ ] User interface mockups
+- [ ] Implement core extension files
+  - [ ] Create manifest.json
+  - [ ] Setup background script
+  - [ ] Setup content script
+  - [ ] Create popup UI
+- [ ] Develop page content scraping functionality
+  - [ ] Product price extraction
+  - [ ] Product specifications extraction
+  - [ ] Energy rating extraction
+- [ ] Implement lifetime cost calculation logic
+  - [ ] Energy cost calculation
+  - [ ] Maintenance cost estimation
+  - [ ] Total lifetime cost calculation
+- [ ] Create user interface for displaying results
+  - [ ] Design popup interface
+  - [ ] Implement cost breakdown visualization
+  - [ ] Add settings for customization
+- [ ] Write documentation and usage guide
+  - [ ] Installation instructions
+  - [ ] Usage guide
+  - [ ] Developer documentation
+  - [ ] Future improvements

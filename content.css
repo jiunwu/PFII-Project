@@ -1,0 +1,144 @@
+/* content.css - Styles for the Lifetime Cost Calculator UI */
+
+/* Main container */
+.ltc-container {
+  font-family: Arial, sans-serif;
+  margin: 20px 0;
+  border: 2px solid #4CAF50;
+  border-radius: 8px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  max-width: 600px;
+  background-color: #fff;
+}
+
+/* Header */
+.ltc-header {
+  background-color: #4CAF50;
+  color: white;
+  padding: 10px 15px;
+  font-weight: bold;
+  font-size: 16px;
+  border-top-left-radius: 6px;
+  border-top-right-radius: 6px;
+}
+
+/* Content area */
+.ltc-content {
+  padding: 15px;
+}
+
+/* Total cost display */
+.ltc-total {
+  font-size: 16px;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #eee;
+}
+
+.ltc-highlight {
+  font-weight: bold;
+  color: #4CAF50;
+  font-size: 18px;
+}
+
+/* Breakdown section */
+.ltc-breakdown {
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #eee;
+}
+
+.ltc-breakdown-title {
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+
+.ltc-breakdown-item {
+  margin-left: 10px;
+  margin-bottom: 5px;
+}
+
+/* Energy information */
+.ltc-energy-info {
+  margin-bottom: 15px;
+  font-size: 14px;
+  color: #555;
+}
+
+/* Button styles */
+.ltc-details-button {
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  padding: 8px 15px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  font-size: 14px;
+  margin: 4px 2px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background-color 0.3s;
+}
+
+.ltc-details-button:hover {
+  background-color: #45a049;
+}
+
+/* Modal styles */
+.ltc-modal {
+  display: block;
+  position: fixed;
+  z-index: 9999;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  background-color: rgba(0, 0, 0, 0.4);
+}
+
+.ltc-modal-content {
+  background-color: #fefefe;
+  margin: 10% auto;
+  padding: 20px;
+  border: 1px solid #888;
+  width: 80%;
+  max-width: 600px;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.ltc-modal-close {
+  color: #aaa;
+  float: right;
+  font-size: 28px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.ltc-modal-close:hover,
+.ltc-modal-close:focus {
+  color: black;
+  text-decoration: none;
+}
+
+.ltc-note {
+  font-style: italic;
+  font-size: 12px;
+  color: #666;
+  margin-top: 20px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .ltc-container {
+    margin: 15px 10px;
+    max-width: 100%;
+  }
+  
+  .ltc-modal-content {
+    width: 90%;
+    margin: 20% auto;
+  }
+}

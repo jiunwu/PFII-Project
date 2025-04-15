@@ -81,8 +81,11 @@ For detailed information, please refer to the following documentation:
 
 ## License
 
-[License Information]
+MIT
 
 ## Credits
 
-Developed by [Your Name/Organization]
+Developed by USI Students (https://usi.ch): 
+Jiun-Yi Wu
+Greta Fumi
+Eray Akyol

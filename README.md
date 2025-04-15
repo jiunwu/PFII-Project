@@ -48,10 +48,10 @@ chrome-extension-ltc/
 
 For detailed information, please refer to the following documentation:
 
-- [User Guide](docs/user_guide.md) - Installation and usage instructions
-- [Developer Documentation](docs/developer_documentation.md) - Technical details and architecture
-- [Extension Architecture](docs/extension_architecture.md) - Component design and data flow
-- [Lifetime Cost Calculation Methodology](docs/lifetime_cost_calculation.md) - Calculation formulas and approach
+- [User Guide](user_guide.md) - Installation and usage instructions
+- [Developer Documentation](developer_documentation.md) - Technical details and architecture
+- [Extension Architecture](extension_architecture.md) - Component design and data flow
+- [Lifetime Cost Calculation Methodology](lifetime_cost_calculation.md) - Calculation formulas and approach
 
 ## Installation
 

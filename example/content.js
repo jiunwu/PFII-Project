@@ -47,10 +47,10 @@ function isProductPage() {
   }
   
   // Check for product-specific elements
-  const productTitleElement = document.querySelector('.product-title, .product-name, h1.name');
-  const priceElement = document.querySelector('.price, .product-price, .price-tag');
+  const productTitleElement = document.querySelector('h1.sc-d571b66f-0.dScdZY').textContent.trim();
+  const priceText = document.querySelector('span.sc-d571b66f-0.iJjLfD').textContent.trim()
   
-  return productTitleElement && priceElement;
+  return productTitleElement && priceText;
 }
 
 // Extract product data from the page
@@ -60,11 +60,10 @@ function extractProductData() {
     // The actual implementation will need to be adapted based on the specific structure of saturn.de
     
     // Extract product name
-    const productName = document.querySelector('.product-title, .product-name, h1.name')?.textContent.trim();
-    
-    // Extract price
-    const priceText = document.querySelector('.price, .product-price, .price-tag')?.textContent.trim();
-    const price = parsePrice(priceText);
+    const productName = document.querySelector('h1.sc-d571b66f-0.dScdZY').textContent.trim();
+
+    const priceElement = document.querySelector('span.sc-d571b66f-0.iJjLfD').textContent.trim();
+    const price = parsePrice(priceElement);
     
     // Extract energy information
     // This will need to be adapted based on how saturn.de displays energy information

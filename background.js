@@ -97,6 +97,8 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     if (isProductPage) {
       console.log('Product page detected:', tab.url);
       // The content script will be automatically injected based on the manifest.json matches
+      console.log('Injecting content script into tab:', tabId);
+     
     } else {
       // Reset badge if not on a product page
       chrome.action.setBadgeText({ 

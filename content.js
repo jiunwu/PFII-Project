@@ -1,26 +1,27 @@
 // content.js - Content script for Lifetime Cost Calculator Extension
 console.log('Lifetime Cost Calculator: Content script loaded');
 // Main function to initialize the content script
-function initLifetimeCostCalculator() {
+async function initLifetimeCostCalculator() {
   console.log('Lifetime Cost Calculator: Content script initialized');
-  
+
   // Check if we're on a product page
-  if (isProductPage()) {
+  if (await isProductPage()) {
     console.log('Product page detected, extracting data...');
-    
+
     // Extract product data from the page
-    const productData = extractProductData();
-    
+    const productData = await extractProductData();
+
     if (productData) {
       // Get user preferences from storage
       chrome.runtime.sendMessage({ type: 'GET_PREFERENCES' }, (response) => {
+        console.log('User preferences received:', response);
         if (response && response.preferences) {
           // Calculate lifetime costs
           const calculationResults = calculateLifetimeCost(productData, response.preferences);
-          
+
           // Display results on the page
           displayLifetimeCost(productData, calculationResults);
-          
+
           // Notify background script that a product was detected
           chrome.runtime.sendMessage({ 
             type: 'PRODUCT_DETECTED',
@@ -40,59 +41,85 @@ function initLifetimeCostCalculator() {
 }
 
 // Check if the current page is a product page
-function isProductPage() {
+async function isProductPage() {
   // Check URL pattern
   if (!window.location.href.includes('/product/')) {
     console.log('Not a product page based on URL');
     return false;
   }
-  
-  // Check for product-specific elements
-  const productTitleElement = document.querySelector('h1.sc-d571b66f-0 dScdZY').textContent.trim();
-  console.log('Product title element:', productTitleElement);
 
-  const priceElement = document.querySelector('span.sc-d571b66f-0 iJjLfD').textContent.trim().replace(/[^0-9,]/g, '').replace(',', '.');
-  console.log('Price element:', priceElement);
-
-  if (!productTitleElement || !priceElement) {
-    console.log('Product title or price element not found');
+  // Use Gemini API to extract product data
+  const pageText = document.body.innerText;
+  const productData = await callGeminiAPIForProductData(pageText);
+  if (!productData) {
+    console.log('Gemini API did not return product data');
     return false;
   }
-  return productTitleElement && priceElement;
+  const productTitleElement = productData.name;
+  const priceElement = productData.price;
+  console.log('Product title element (Gemini):', productTitleElement);
+  console.log('Price element (Gemini):', priceElement);
+  if (!productTitleElement || !priceElement) {
+    console.log('Product title or price element not found in Gemini API result');
+    return false;
+  }
+  // Store productData for later use
+  window._ltcGeminiProductData = productData;
+  return true;
 }
 
-// Extract product data from the page
-function extractProductData() {
+// Helper to call Gemini API for product data extraction
+async function callGeminiAPIForProductData(pageText) {
+  return new Promise((resolve, reject) => {
+    chrome.storage.sync.get(['geminiApiKey'], async function(result) {
+      const apiKey = result.geminiApiKey;
+      if (!apiKey) {
+        console.error('Gemini API key not set.');
+        resolve(null);
+        return;
+      }
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+      const prompt = `Extract the following product information from this text (if available):\n- Product name\n- Price (as a number, in euros)\n- Energy consumption (kWh/year)\n- Energy efficiency class (A+++, A++, A+, A, B, C, D, E, F, G)\n- Product type (e.g., refrigerator, washing machine, dishwasher, dryer)\nReturn the result as a JSON object with keys: name, price, energyConsumption, energyEfficiencyClass, productType.\n\nText:\n${pageText}`;
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }]
+          })
+        });
+        const data = await response.json();
+        try {
+          // Remove markdown code block markers if present
+          let text = data.candidates[0].content.parts[0].text;
+          text = text.replace(/```[a-zA-Z]*\n?|```/g, '').trim();
+          resolve(JSON.parse(text));
+        } catch (e) {
+          console.error('Gemini API response parsing error:', e, data);
+          resolve(null);
+        }
+      } catch (err) {
+        console.error('Error calling Gemini API:', err);
+        resolve(null);
+      }
+    });
+  });
+}
+
+// Extract product data from the page using Gemini API
+async function extractProductData() {
   try {
-    // This is a placeholder implementation
-    // The actual implementation will need to be adapted based on the specific structure of saturn.de
-    
-    // Extract product name
-    const productName = document.querySelector('h1.sc-d571b66f-0 dScdZY').textContent.trim();
-    const priceText = document.querySelector('span.sc-d571b66f-0 iJjLfD').textContent.trim().replace(/[^0-9,]/g, '').replace(',', '.');
-    const price = parsePrice(priceText);
-    
-    // Extract energy information
-    // This will need to be adapted based on how saturn.de displays energy information
-    const energyConsumption = extractEnergyConsumption();
-    const energyEfficiencyClass = extractEnergyEfficiencyClass();
-    
-    // Extract product type (refrigerator, washing machine, etc.)
-    const productType = determineProductType();
-    
-    if (productName && price) {
-      return {
-        name: productName,
-        price: price,
-        energyConsumption: energyConsumption,
-        energyEfficiencyClass: energyEfficiencyClass,
-        productType: productType
-      };
+    const pageText = document.body.innerText;
+    const productData = await callGeminiAPIForProductData(pageText);
+    if (productData && productData.name && productData.price) {
+      console.log('Product data extracted:', productData);
+      return productData;
     }
-    
     return null;
   } catch (error) {
-    console.error('Error extracting product data:', error);
+    console.error('Error extracting product data with Gemini:', error);
     return null;
   }
 }
@@ -110,43 +137,21 @@ function parsePrice(priceText) {
   return parseFloat(normalizedString);
 }
 
-// Extract energy consumption from the page
+// Extract energy consumption from Gemini API result
 function extractEnergyConsumption() {
-  // This is a placeholder implementation
-  // Look for energy consumption information (kWh/year)
-  const energyElements = document.querySelectorAll('.product-specs tr, .product-details tr, .technical-details tr');
-  
-  for (const element of energyElements) {
-    const text = element.textContent.toLowerCase();
-    if (text.includes('energieverbrauch') || text.includes('energy consumption')) {
-      // Extract the numeric value
-      const match = text.match(/(\d+[\.,]?\d*)\s*kwh/i);
-      if (match && match[1]) {
-        return parseFloat(match[1].replace(',', '.'));
-      }
-    }
+  const productData = window._ltcGeminiProductData;
+  if (productData && productData.energyConsumption) {
+    return productData.energyConsumption;
   }
-  
-  // Default value if not found
-  return 300; // Placeholder average value for refrigerators
+  return 300; // Fallback default
 }
 
-// Extract energy efficiency class from the page
+// Extract energy efficiency class from Gemini API result
 function extractEnergyEfficiencyClass() {
-  // This is a placeholder implementation
-  const energyElements = document.querySelectorAll('.product-specs tr, .product-details tr, .technical-details tr');
-  
-  for (const element of energyElements) {
-    const text = element.textContent.toLowerCase();
-    if (text.includes('energieeffizienzklasse') || text.includes('energy class') || text.includes('energy efficiency')) {
-      // Look for energy class (A+++, A++, A+, A, B, C, D, E, F, G)
-      const match = text.match(/klasse\s*([A-G]\+*)/i) || text.match(/class\s*([A-G]\+*)/i);
-      if (match && match[1]) {
-        return match[1].toUpperCase();
-      }
-    }
+  const productData = window._ltcGeminiProductData;
+  if (productData && productData.energyEfficiencyClass) {
+    return productData.energyEfficiencyClass;
   }
-  
   return 'Unknown';
 }
 
@@ -205,6 +210,8 @@ function calculateLifetimeCost(productData, preferences) {
       maintenanceNPV += repairCost / Math.pow(1 + discountRate, repairYear);
     }
   }
+
+  console.log('Maintenance NPV:', maintenanceNPV);
   
   // Calculate total lifetime cost
   const totalLifetimeCost = productData.price + energyNPV + maintenanceNPV;
@@ -230,6 +237,10 @@ function displayLifetimeCost(productData, calculationResults) {
   
   // Format currency values
   const formatCurrency = (value) => {
+    if (typeof value !== 'number' || isNaN(value)) {
+      console.error('Invalid value passed to formatCurrency:', value);
+      return '€0,00'; // Default fallback
+    }
     return '€' + value.toFixed(2).replace('.', ',');
   };
   

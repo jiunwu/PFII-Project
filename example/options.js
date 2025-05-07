@@ -6,6 +6,21 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // Add event listener for save button
   document.getElementById('saveButton').addEventListener('click', savePreferences);
+
+  // Load saved Gemini API key
+  chrome.storage.sync.get(['geminiApiKey'], function(result) {
+    if (result.geminiApiKey) {
+      document.getElementById('geminiApiKey').value = result.geminiApiKey;
+    }
+  });
+});
+
+document.getElementById('saveApiKey').addEventListener('click', function() {
+  const apiKey = document.getElementById('geminiApiKey').value;
+  chrome.storage.sync.set({ geminiApiKey: apiKey }, function() {
+    document.getElementById('status').textContent = 'API key saved!';
+    setTimeout(() => document.getElementById('status').textContent = '', 2000);
+  });
 });
 
 /**

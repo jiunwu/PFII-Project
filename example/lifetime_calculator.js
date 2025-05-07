@@ -19,28 +19,6 @@ class LifetimeCalculator {
         dishwasher: 9,
         dryer: 8,
         unknown: 10
-      },
-      maintenanceCosts: {
-        refrigerator: {
-          averageRepairCost: 350,
-          expectedRepairs: 2
-        },
-        washingMachine: {
-          averageRepairCost: 250,
-          expectedRepairs: 3
-        },
-        dishwasher: {
-          averageRepairCost: 200,
-          expectedRepairs: 2
-        },
-        dryer: {
-          averageRepairCost: 220,
-          expectedRepairs: 2
-        },
-        unknown: {
-          averageRepairCost: 300,
-          expectedRepairs: 2
-        }
       }
     };
   }
@@ -64,16 +42,25 @@ class LifetimeCalculator {
     const energyResults = this.calculateEnergyCosts(productData, lifespan);
 
     // Calculate maintenance costs
-    const maintenanceResults = this.calculateMaintenanceCosts(productType, lifespan);
+    const averageRepairCost = typeof productData.averageRepairCost === 'number' ? productData.averageRepairCost : 350;
+    const numRepairs = typeof productData.expectedRepairs === 'number' ? productData.expectedRepairs : 2;
+    const maintenanceResults = this.calculateMaintenanceCosts(averageRepairCost, numRepairs, lifespan);
+
+    // Cap maintenanceCostNPV at productData.price
+    let cappedMaintenanceCostNPV = maintenanceResults.maintenanceCostNPV;
+    if (cappedMaintenanceCostNPV > productData.price) {
+      console.warn(`LifetimeCalculator: MaintenanceCostNPV (${cappedMaintenanceCostNPV.toFixed(2)}) exceeded product price (${productData.price.toFixed(2)}). Capping at price.`);
+      cappedMaintenanceCostNPV = productData.price;
+    }
 
     // Calculate total lifetime cost
-    const totalLifetimeCost = productData.price + energyResults.energyCostNPV + maintenanceResults.maintenanceCostNPV;
+    const totalLifetimeCost = productData.price + energyResults.energyCostNPV + cappedMaintenanceCostNPV;
 
     // Return comprehensive results
     return {
       purchasePrice: productData.price,
       energyCostNPV: energyResults.energyCostNPV,
-      maintenanceCostNPV: maintenanceResults.maintenanceCostNPV,
+      maintenanceCostNPV: cappedMaintenanceCostNPV,
       totalLifetimeCost: totalLifetimeCost,
       annualEnergyConsumption: energyResults.annualEnergyConsumption,
       annualEnergyCost: energyResults.annualEnergyCost,
@@ -108,8 +95,12 @@ class LifetimeCalculator {
    */
   calculateEnergyCosts(productData, lifespan) {
     // Get annual energy consumption
-    const annualEnergyConsumption = productData.energyConsumption || 
-                                   this.estimateEnergyConsumption(productData);
+    // Prioritize productData.energyConsumption (expected from Gemini API)
+    let annualEnergyConsumption = productData.energyConsumption;
+    if (typeof annualEnergyConsumption !== 'number' || isNaN(annualEnergyConsumption)) {
+      console.warn('LifetimeCalculator: productData.energyConsumption is missing or invalid. Using default 300 kWh/year.');
+      annualEnergyConsumption = 300; // Default fallback
+    }
 
     // Calculate annual energy cost
     const annualEnergyCost = annualEnergyConsumption * this.preferences.electricityRate;
@@ -129,18 +120,13 @@ class LifetimeCalculator {
 
   /**
    * Calculate maintenance costs over the product lifetime
-   * @param {string} productType - Type of product
+   * @param {string} productType - Type of product (NO LONGER USED, but kept for now to avoid breaking calls if any)
    * @param {number} lifespan - Product lifespan in years
+   * @param {number} averageRepairCost - Average cost of a single repair
+   * @param {number} numRepairs - Expected number of repairs over the lifespan
    * @returns {Object} Maintenance cost calculation results
    */
-  calculateMaintenanceCosts(productType, lifespan) {
-    // Get maintenance cost parameters
-    const maintenanceInfo = this.preferences.maintenanceCosts[productType] || 
-                           this.preferences.maintenanceCosts.unknown;
-
-    const repairCost = maintenanceInfo.averageRepairCost;
-    const numRepairs = maintenanceInfo.expectedRepairs;
-
+  calculateMaintenanceCosts(averageRepairCost, numRepairs, lifespan) {
     // Calculate when repairs are likely to happen
     const repairYears = [];
     for (let i = 1; i <= numRepairs; i++) {
@@ -153,91 +139,14 @@ class LifetimeCalculator {
     // Calculate NPV of maintenance costs
     let maintenanceCostNPV = 0;
     for (const year of repairYears) {
-      maintenanceCostNPV += repairCost / Math.pow(1 + this.preferences.discountRate, year);
+      maintenanceCostNPV += averageRepairCost / Math.pow(1 + this.preferences.discountRate, year);
     }
 
     return {
       maintenanceCostNPV,
       repairYears,
-      repairCost
+      repairCost: averageRepairCost
     };
-  }
-
-  /**
-   * Estimate energy consumption if not provided
-   * @param {Object} productData - Product data
-   * @returns {number} Estimated annual energy consumption in kWh
-   */
-  estimateEnergyConsumption(productData) {
-    const productType = productData.productType || 'unknown';
-    const energyClass = productData.energyEfficiencyClass;
-
-    // If we have energy class, estimate based on that
-    if (energyClass && energyClass !== 'Unknown') {
-      return this.estimateEnergyConsumptionFromClass(energyClass, productType);
-    }
-
-    // Default values based on product type
-    switch (productType) {
-      case 'refrigerator': return 300; // Average for refrigerators
-      case 'washingMachine': return 200; // Average for washing machines
-      case 'dishwasher': return 250; // Average for dishwashers
-      case 'dryer': return 500; // Average for dryers
-      default: return 300; // General fallback
-    }
-  }
-
-  /**
-   * Estimate energy consumption based on energy efficiency class
-   * @param {string} energyClass - Energy efficiency class
-   * @param {string} productType - Type of product
-   * @returns {number} Estimated annual energy consumption in kWh
-   */
-  estimateEnergyConsumptionFromClass(energyClass, productType) {
-    // These are rough estimates based on typical values
-    if (productType === 'refrigerator') {
-      switch (energyClass) {
-        case 'A+++': return 150;
-        case 'A++': return 200;
-        case 'A+': return 250;
-        case 'A': return 300;
-        case 'B': return 350;
-        case 'C': return 400;
-        case 'D': return 450;
-        default: return 300;
-      }
-    } else if (productType === 'washingMachine') {
-      switch (energyClass) {
-        case 'A+++': return 130;
-        case 'A++': return 160;
-        case 'A+': return 190;
-        case 'A': return 220;
-        case 'B': return 250;
-        case 'C': return 280;
-        default: return 200;
-      }
-    } else if (productType === 'dishwasher') {
-      switch (energyClass) {
-        case 'A+++': return 180;
-        case 'A++': return 210;
-        case 'A+': return 240;
-        case 'A': return 270;
-        case 'B': return 300;
-        default: return 250;
-      }
-    } else if (productType === 'dryer') {
-      switch (energyClass) {
-        case 'A+++': return 160;
-        case 'A++': return 200;
-        case 'A+': return 250;
-        case 'A': return 300;
-        case 'B': return 400;
-        case 'C': return 500;
-        default: return 350;
-      }
-    }
-    
-    return 300; // Default fallback
   }
 
   /**

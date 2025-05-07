@@ -43,7 +43,8 @@ async function initLifetimeCostCalculator() {
 // Check if the current page is a product page
 async function isProductPage() {
   // Check URL pattern
-  if (!window.location.href.includes('/product/')) {
+  const currentUrl = window.location.href;
+  if (!currentUrl.includes('/product/') && !currentUrl.includes('saturn.de')) {
     console.log('Not a product page based on URL');
     return false;
   }
@@ -79,7 +80,18 @@ async function callGeminiAPIForProductData(pageText) {
         return;
       }
       const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
-      const prompt = `Extract the following product information from this text (if available):\n- Product name\n- Price (as a number, in euros)\n- Energy consumption (kWh/year)\n- Energy efficiency class (A+++, A++, A+, A, B, C, D, E, F, G)\n- Product type (e.g., refrigerator, washing machine, dishwasher, dryer)\nReturn the result as a JSON object with keys: name, price, energyConsumption, energyEfficiencyClass, productType.\n\nText:\n${pageText}`;
+      const prompt = `Extract the following product information from this text (if available):
+- Product name
+- Price (as a number, in euros)
+- Energy consumption (kWh/year)
+- Energy efficiency class (A+++, A++, A+, A, B, C, D, E, F, G)
+- Product type (e.g., refrigerator, washing machine, dishwasher, dryer)
+- Average repair cost (as a number, in euros, for a typical repair for this product type)
+- Expected number of repairs (integer, over the product's typical lifespan)
+Return the result as a JSON object with keys: name, price, energyConsumption, energyEfficiencyClass, productType, averageRepairCost, expectedRepairs.
+
+Text:
+${pageText}`;
       try {
         const response = await fetch(url, {
           method: 'POST',
@@ -178,18 +190,33 @@ function calculateLifetimeCost(productData, preferences) {
   const electricityRate = preferences.electricityRate;
   const discountRate = preferences.discountRate;
   
-  // Determine appliance type and get corresponding lifespan
-  const productType = productData.productType || 'refrigerator';
-  const lifespan = preferences.applianceLifespans[productType] || 10;
+  // Determine appliance type and get corresponding lifespan from preferences if not provided by productData
+  const productType = productData.productType || 'refrigerator'; // Default if not specified
+  const lifespan = productData.lifespan || preferences.applianceLifespans[productType] || 10;
   
-  // Get maintenance cost estimates
-  const maintenanceInfo = preferences.maintenanceCosts[productType] || {
-    averageRepairCost: 350,
-    expectedRepairs: 2
-  };
+  // Get energy consumption from productData (from Gemini) or use a default
+  const annualEnergyConsumption = typeof productData.energyConsumption === 'number' 
+                                  ? productData.energyConsumption 
+                                  : 300; // kWh/year default
+  if (typeof productData.energyConsumption !== 'number') {
+    console.warn('Gemini API did not provide energyConsumption, using default:', annualEnergyConsumption);
+  }
   
+  // Get maintenance cost estimates from productData (from Gemini) or use defaults
+  const averageRepairCost = typeof productData.averageRepairCost === 'number' 
+                            ? productData.averageRepairCost 
+                            : 350; // Default average repair cost
+  const numRepairs = typeof productData.expectedRepairs === 'number' 
+                     ? productData.expectedRepairs 
+                     : 2; // Default number of repairs
+
+  let maintenanceDataSource = 'Gemini API';
+  if (typeof productData.averageRepairCost !== 'number' || typeof productData.expectedRepairs !== 'number') {
+    console.warn('Gemini API did not provide full maintenance data, using defaults. Repair Cost:', averageRepairCost, 'Num Repairs:', numRepairs);
+    maintenanceDataSource = 'Default Fallback Values';
+  }
+
   // Calculate annual energy cost
-  const annualEnergyConsumption = productData.energyConsumption || 300; // kWh/year
   const annualEnergyCost = annualEnergyConsumption * electricityRate;
   
   // Calculate NPV of energy costs over lifespan
@@ -201,18 +228,22 @@ function calculateLifetimeCost(productData, preferences) {
   // Calculate NPV of maintenance costs
   // Assume repairs happen at 1/3 and 2/3 of the lifespan
   let maintenanceNPV = 0;
-  const repairCost = maintenanceInfo.averageRepairCost;
-  const numRepairs = maintenanceInfo.expectedRepairs;
   
   if (numRepairs > 0) {
     for (let i = 1; i <= numRepairs; i++) {
       const repairYear = Math.round(i * lifespan / (numRepairs + 1));
-      maintenanceNPV += repairCost / Math.pow(1 + discountRate, repairYear);
+      maintenanceNPV += averageRepairCost / Math.pow(1 + discountRate, repairYear);
     }
   }
 
   console.log('Maintenance NPV:', maintenanceNPV);
   
+  // Cap maintenanceNPV at productData.price
+  if (maintenanceNPV > productData.price) {
+    console.warn(`ContentScript: MaintenanceNPV (${maintenanceNPV.toFixed(2)}) exceeded product price (${productData.price.toFixed(2)}). Capping at price.`);
+    maintenanceNPV = productData.price;
+  }
+
   // Calculate total lifetime cost
   const totalLifetimeCost = productData.price + energyNPV + maintenanceNPV;
   
@@ -224,7 +255,10 @@ function calculateLifetimeCost(productData, preferences) {
     annualEnergyConsumption: annualEnergyConsumption,
     annualEnergyCost: annualEnergyCost,
     lifespan: lifespan,
-    energyEfficiencyClass: productData.energyEfficiencyClass
+    energyEfficiencyClass: productData.energyEfficiencyClass,
+    averageRepairCostUsed: averageRepairCost,
+    numRepairsUsed: numRepairs,
+    maintenanceDataSource: maintenanceDataSource
   };
 }
 
@@ -339,6 +373,9 @@ function showCalculationDetails(productData, calculationResults) {
       
       <h3>Maintenance Costs</h3>
       <p>
+        <strong>Average Repair Cost Used:</strong> ${formatCurrency(calculationResults.averageRepairCostUsed)}<br>
+        <strong>Expected Number of Repairs:</strong> ${calculationResults.numRepairsUsed}<br>
+        <strong>Data Source:</strong> ${calculationResults.maintenanceDataSource}<br>
         <strong>Total Maintenance Cost (NPV):</strong> ${formatCurrency(calculationResults.maintenanceCostNPV)}
       </p>
       

@@ -40,19 +40,6 @@ function loadSavedPreferences() {
       document.getElementById('washingMachineLifespan').value = preferences.applianceLifespans.washingMachine;
       document.getElementById('dishwasherLifespan').value = preferences.applianceLifespans.dishwasher;
       document.getElementById('dryerLifespan').value = preferences.applianceLifespans.dryer;
-      
-      // Set maintenance costs
-      document.getElementById('refrigeratorRepairCost').value = preferences.maintenanceCosts.refrigerator.averageRepairCost;
-      document.getElementById('refrigeratorRepairs').value = preferences.maintenanceCosts.refrigerator.expectedRepairs;
-      
-      document.getElementById('washingMachineRepairCost').value = preferences.maintenanceCosts.washingMachine.averageRepairCost;
-      document.getElementById('washingMachineRepairs').value = preferences.maintenanceCosts.washingMachine.expectedRepairs;
-      
-      document.getElementById('dishwasherRepairCost').value = preferences.maintenanceCosts.dishwasher.averageRepairCost;
-      document.getElementById('dishwasherRepairs').value = preferences.maintenanceCosts.dishwasher.expectedRepairs;
-      
-      document.getElementById('dryerRepairCost').value = preferences.maintenanceCosts.dryer.averageRepairCost;
-      document.getElementById('dryerRepairs').value = preferences.maintenanceCosts.dryer.expectedRepairs;
     }
   });
 }
@@ -85,24 +72,6 @@ function savePreferences() {
       washingMachine: getValidatedNumberInput('washingMachineLifespan', 1, 20, 8),
       dishwasher: getValidatedNumberInput('dishwasherLifespan', 1, 20, 9),
       dryer: getValidatedNumberInput('dryerLifespan', 1, 20, 8)
-    },
-    maintenanceCosts: {
-      refrigerator: {
-        averageRepairCost: getValidatedNumberInput('refrigeratorRepairCost', 0, 1000, 350),
-        expectedRepairs: getValidatedNumberInput('refrigeratorRepairs', 0, 10, 2)
-      },
-      washingMachine: {
-        averageRepairCost: getValidatedNumberInput('washingMachineRepairCost', 0, 1000, 250),
-        expectedRepairs: getValidatedNumberInput('washingMachineRepairs', 0, 10, 3)
-      },
-      dishwasher: {
-        averageRepairCost: getValidatedNumberInput('dishwasherRepairCost', 0, 1000, 200),
-        expectedRepairs: getValidatedNumberInput('dishwasherRepairs', 0, 10, 2)
-      },
-      dryer: {
-        averageRepairCost: getValidatedNumberInput('dryerRepairCost', 0, 1000, 220),
-        expectedRepairs: getValidatedNumberInput('dryerRepairs', 0, 10, 2)
-      }
     }
   };
   

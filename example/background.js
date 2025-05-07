@@ -13,24 +13,6 @@ chrome.runtime.onInstalled.addListener(() => {
           washingMachine: 8,
           dishwasher: 9,
           dryer: 8
-        },
-        maintenanceCosts: {
-          refrigerator: {
-            averageRepairCost: 350,
-            expectedRepairs: 2
-          },
-          washingMachine: {
-            averageRepairCost: 250,
-            expectedRepairs: 3
-          },
-          dishwasher: {
-            averageRepairCost: 200,
-            expectedRepairs: 2
-          },
-          dryer: {
-            averageRepairCost: 220,
-            expectedRepairs: 2
-          }
         }
       };
       

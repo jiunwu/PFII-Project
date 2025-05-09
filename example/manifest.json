@@ -23,7 +23,13 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://*.saturn.de/*/product/*", "https://*.saturn.de/de/product/*","https://saturn.de/de/product/*"],
+      "matches": [
+        "https://*.saturn.de/*/product/*",
+        "https://*.saturn.de/de/product/*",
+        "https://saturn.de/de/product/*",
+        "https://www.zara.com/*/product/*",
+        "https://www.zara.com/*"
+      ],
       "js": ["content.js"],
       "css": ["content.css"],
       "run_at": "document_idle"
@@ -35,6 +41,7 @@
     "scripting"
   ],
   "host_permissions": [
-    "https://*.saturn.de/*"
+    "https://*.saturn.de/*",
+    "https://www.zara.com/*"
   ]
 }

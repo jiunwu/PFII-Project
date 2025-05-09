@@ -18,6 +18,7 @@ class LifetimeCalculator {
         washingMachine: 8,
         dishwasher: 9,
         dryer: 8,
+        clothing: 5,
         unknown: 10
       }
     };
@@ -300,6 +301,35 @@ class LifetimeCalculator {
       product2Cumulative: cumulative2
     };
   }
+}
+
+// Check if the current page is a product page
+async function isProductPage() {
+  // Check URL pattern for product pages, including Zara
+  const currentUrl = window.location.href;
+  if (!currentUrl.includes('/product/') && !currentUrl.includes('saturn.de') && !currentUrl.includes('zara.com')) {
+    console.log('Not a product page based on URL');
+    return false;
+  }
+  // Additional checks can be added here
+  return true;
+}
+
+// Determine the product type based on page content
+function determineProductType() {
+  const pageText = document.body.textContent.toLowerCase();
+  if (pageText.includes('kühlschrank') || pageText.includes('refrigerator') || pageText.includes('fridge')) {
+    return 'refrigerator';
+  } else if (pageText.includes('waschmaschine') || pageText.includes('washing machine')) {
+    return 'washingMachine';
+  } else if (pageText.includes('geschirrspüler') || pageText.includes('dishwasher')) {
+    return 'dishwasher';
+  } else if (pageText.includes('trockner') || pageText.includes('dryer')) {
+    return 'dryer';
+  } else if (pageText.includes('clothing') || pageText.includes('shirt') || pageText.includes('pants') || pageText.includes('zara')) {
+    return 'clothing';
+  }
+  return 'unknown';
 }
 
 // Export the calculator

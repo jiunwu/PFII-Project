@@ -1,7 +1,20 @@
 // content.js - Content script for Lifetime Cost Calculator Extension
 console.log('Lifetime Cost Calculator: Content script loaded');
+
+// Debug: Log current URL and document title
+console.log('Current URL:', window.location.href);
+console.log('Document title:', document.title);
+
+// Ensure the content script is initialized (robust for all page states)
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+  initLifetimeCostCalculator();
+} else {
+  window.addEventListener('DOMContentLoaded', initLifetimeCostCalculator);
+}
+
 // Main function to initialize the content script
 async function initLifetimeCostCalculator() {
+  console.log('initLifetimeCostCalculator called');
   console.log('Lifetime Cost Calculator: Content script initialized');
 
   // Check if we're on a product page
@@ -42,9 +55,9 @@ async function initLifetimeCostCalculator() {
 
 // Check if the current page is a product page
 async function isProductPage() {
-  // Check URL pattern
   const currentUrl = window.location.href;
-  if (!currentUrl.includes('/product/') && !currentUrl.includes('saturn.de')) {
+  console.log('Checking if product page. URL:', currentUrl);
+  if (!currentUrl.includes('/product/') && !currentUrl.includes('saturn.de') && !currentUrl.includes('zara.com')) {
     console.log('Not a product page based on URL');
     return false;
   }
@@ -71,6 +84,7 @@ async function isProductPage() {
 
 // Helper to call Gemini API for product data extraction
 async function callGeminiAPIForProductData(pageText) {
+  console.log('Calling Gemini API for product data extraction...');
   return new Promise((resolve, reject) => {
     chrome.storage.sync.get(['geminiApiKey'], async function(result) {
       const apiKey = result.geminiApiKey;
@@ -85,10 +99,11 @@ async function callGeminiAPIForProductData(pageText) {
 - Price (as a number, in euros)
 - Energy consumption (kWh/year)
 - Energy efficiency class (A+++, A++, A+, A, B, C, D, E, F, G)
-- Product type (e.g., refrigerator, washing machine, dishwasher, dryer)
+- Product type (e.g., refrigerator, washing machine, dishwasher, dryer, clothing)
 - Average repair cost (as a number, in euros, for a typical repair for this product type)
 - Expected number of repairs (integer, over the product's typical lifespan)
-Return the result as a JSON object with keys: name, price, energyConsumption, energyEfficiencyClass, productType, averageRepairCost, expectedRepairs.
+- Fabric quality (for clothing, a value between 0 and 1)
+Return the result as a JSON object with keys: name, price, energyConsumption, energyEfficiencyClass, productType, averageRepairCost, expectedRepairs, fabricQuality.
 
 Text:
 ${pageText}`;
@@ -103,6 +118,7 @@ ${pageText}`;
           })
         });
         const data = await response.json();
+        console.log('Gemini API raw response:', data);
         try {
           // Remove markdown code block markers if present
           let text = data.candidates[0].content.parts[0].text;
@@ -120,18 +136,89 @@ ${pageText}`;
   });
 }
 
-// Extract product data from the page using Gemini API
+// Extract product data from the page using Gemini API, with fallback for Zara
 async function extractProductData() {
   try {
     const pageText = document.body.innerText;
-    const productData = await callGeminiAPIForProductData(pageText);
+    let productData = await callGeminiAPIForProductData(pageText);
+    console.log('extractProductData result:', productData);
     if (productData && productData.name && productData.price) {
       console.log('Product data extracted:', productData);
       return productData;
     }
+    // Fallback: Try to extract from Zara DOM if Gemini fails
+    if (window.location.hostname.includes('zara.com')) {
+      console.warn('Gemini failed, attempting Zara fallback extraction');
+      // Zara product name
+      let name = '';
+      let nameSelectors = [
+        '[data-product-name]',
+        'h1.product-name',
+        'h1',
+        '.product-detail-info__header-name',
+        '.product-name',
+        '.product-header__title',
+        '.product-title',
+      ];
+      for (let sel of nameSelectors) {
+        let elem = document.querySelector(sel);
+        if (elem && elem.textContent.trim().length > 2) {
+          name = elem.textContent.trim();
+          console.log('Zara fallback: found name with selector', sel, name);
+          break;
+        }
+      }
+      if (!name) console.warn('Zara fallback: name not found');
+      // Zara price
+      let price = '';
+      let priceSelectors = [
+        '[data-product-price]',
+        '.price__amount',
+        '.price-current',
+        '.product-price',
+        '[itemprop="price"]',
+        '.product-detail-info__header-price',
+        '.price',
+      ];
+      for (let sel of priceSelectors) {
+        let elem = document.querySelector(sel);
+        if (elem && elem.textContent.trim().length > 0) {
+          price = parsePrice(elem.textContent);
+          console.log('Zara fallback: found price with selector', sel, price);
+          break;
+        }
+      }
+      if (!price) console.warn('Zara fallback: price not found');
+      // Zara material/fabric
+      let material = '';
+      let materialSelectors = [
+        '.composition',
+        '.product-detail-info__composition',
+        '.product-composition',
+        '[data-product-composition]',
+        '.product-info-description',
+        '.product-description',
+        '.description',
+      ];
+      for (let sel of materialSelectors) {
+        let elem = document.querySelector(sel);
+        if (elem && elem.textContent.trim().length > 2) {
+          material = elem.textContent.trim();
+          console.log('Zara fallback: found material with selector', sel, material);
+          break;
+        }
+      }
+      if (!material) console.warn('Zara fallback: material not found');
+      if (name && price) {
+        const fallbackData = { name, price, material, productType: 'clothing' };
+        console.log('Zara fallback product data:', fallbackData);
+        return fallbackData;
+      }
+      console.warn('Zara fallback extraction failed');
+    }
     return null;
   } catch (error) {
-    console.error('Error extracting product data with Gemini:', error);
+    console.error('Error extracting product data with Gemini or fallback:', error);
     return null;
   }
 }
@@ -170,7 +257,6 @@ function extractEnergyEfficiencyClass() {
 // Determine product type based on page content
 function determineProductType() {
   const pageText = document.body.textContent.toLowerCase();
-  
   if (pageText.includes('kühlschrank') || pageText.includes('refrigerator') || pageText.includes('fridge')) {
     return 'refrigerator';
   } else if (pageText.includes('waschmaschine') || pageText.includes('washing machine')) {
@@ -179,253 +265,107 @@ function determineProductType() {
     return 'dishwasher';
   } else if (pageText.includes('trockner') || pageText.includes('dryer')) {
     return 'dryer';
+  } else if (pageText.includes('clothing') || pageText.includes('shirt') || pageText.includes('pants') || pageText.includes('zara')) {
+    return 'clothing';
   }
-  
   return 'unknown';
 }
 
 // Calculate lifetime cost based on product data and user preferences
 function calculateLifetimeCost(productData, preferences) {
-  // Get relevant preferences
-  const electricityRate = preferences.electricityRate;
-  const discountRate = preferences.discountRate;
-  
-  // Determine appliance type and get corresponding lifespan from preferences if not provided by productData
-  const productType = productData.productType || 'refrigerator'; // Default if not specified
-  const lifespan = productData.lifespan || preferences.applianceLifespans[productType] || 10;
-  
-  // Get energy consumption from productData (from Gemini) or use a default
-  const annualEnergyConsumption = typeof productData.energyConsumption === 'number' 
-                                  ? productData.energyConsumption 
-                                  : 300; // kWh/year default
-  if (typeof productData.energyConsumption !== 'number') {
-    console.warn('Gemini API did not provide energyConsumption, using default:', annualEnergyConsumption);
-  }
-  
-  // Get maintenance cost estimates from productData (from Gemini) or use defaults
-  const averageRepairCost = typeof productData.averageRepairCost === 'number' 
-                            ? productData.averageRepairCost 
-                            : 350; // Default average repair cost
-  const numRepairs = typeof productData.expectedRepairs === 'number' 
-                     ? productData.expectedRepairs 
-                     : 2; // Default number of repairs
+  console.log('Calculating lifetime cost for:', productData, preferences);
 
-  let maintenanceDataSource = 'Gemini API';
-  if (typeof productData.averageRepairCost !== 'number' || typeof productData.expectedRepairs !== 'number') {
-    console.warn('Gemini API did not provide full maintenance data, using defaults. Repair Cost:', averageRepairCost, 'Num Repairs:', numRepairs);
-    maintenanceDataSource = 'Default Fallback Values';
-  }
-
-  // Calculate annual energy cost
-  const annualEnergyCost = annualEnergyConsumption * electricityRate;
-  
-  // Calculate NPV of energy costs over lifespan
-  let energyNPV = 0;
-  for (let year = 1; year <= lifespan; year++) {
-    energyNPV += annualEnergyCost / Math.pow(1 + discountRate, year);
-  }
-  
-  // Calculate NPV of maintenance costs
-  // Assume repairs happen at 1/3 and 2/3 of the lifespan
-  let maintenanceNPV = 0;
-  
-  if (numRepairs > 0) {
-    for (let i = 1; i <= numRepairs; i++) {
-      const repairYear = Math.round(i * lifespan / (numRepairs + 1));
-      maintenanceNPV += averageRepairCost / Math.pow(1 + discountRate, repairYear);
+  // Clothing-specific calculation
+  if (productData.productType === 'clothing') {
+    // Determine fabric/material quality and lifespan
+    let material = (productData.material || '').toLowerCase();
+    let quality = 'medium';
+    let lifespan = 5; // default
+    if (material.includes('wool') || material.includes('cashmere')) {
+      quality = 'high';
+      lifespan = 20;
+    } else if (material.includes('cotton') || material.includes('linen')) {
+      quality = 'medium';
+      lifespan = 10;
+    } else if (material.includes('polyester') || material.includes('synthetic')) {
+      quality = 'low';
+      lifespan = 5;
     }
-  }
+    // If user wants a more pessimistic scenario, use lower bounds
+    if (material.includes('cheap') || material.includes('low quality')) {
+      lifespan = 2;
+      quality = 'low';
+    } else if (material.includes('high quality')) {
+      lifespan = 20;
+      quality = 'high';
+    }
 
-  console.log('Maintenance NPV:', maintenanceNPV);
-  
-  // Cap maintenanceNPV at productData.price
-  if (maintenanceNPV > productData.price) {
-    console.warn(`ContentScript: MaintenanceNPV (${maintenanceNPV.toFixed(2)}) exceeded product price (${productData.price.toFixed(2)}). Capping at price.`);
-    maintenanceNPV = productData.price;
-  }
+    // Amortize cost over lifespan
+    const purchasePrice = productData.price;
+    const annualCost = purchasePrice / lifespan;
 
-  // Calculate total lifetime cost
-  const totalLifetimeCost = productData.price + energyNPV + maintenanceNPV;
-  
-  return {
-    purchasePrice: productData.price,
-    energyCostNPV: energyNPV,
-    maintenanceCostNPV: maintenanceNPV,
-    totalLifetimeCost: totalLifetimeCost,
-    annualEnergyConsumption: annualEnergyConsumption,
-    annualEnergyCost: annualEnergyCost,
-    lifespan: lifespan,
-    energyEfficiencyClass: productData.energyEfficiencyClass,
-    averageRepairCostUsed: averageRepairCost,
-    numRepairsUsed: numRepairs,
-    maintenanceDataSource: maintenanceDataSource
-  };
+    // Maintenance cost: synthetic garments need more frequent washing
+    let maintenanceCostPerYear = 0;
+    let washesPerYear = 40;
+    if (quality === 'low' || material.includes('polyester') || material.includes('synthetic')) {
+      washesPerYear = 60; // 50% more washes for synthetics
+    }
+    maintenanceCostPerYear = washesPerYear * 0.5; // 0.5€ per wash
+    const totalMaintenanceCost = maintenanceCostPerYear * lifespan;
+    const totalLifetimeCost = purchasePrice + totalMaintenanceCost;
+
+    return {
+      purchasePrice,
+      annualCost,
+      lifespan,
+      material,
+      quality,
+      maintenanceCostPerYear,
+      totalMaintenanceCost,
+      totalLifetimeCost,
+      productType: 'clothing',
+      breakdown: {
+        purchasePrice,
+        annualCost,
+        lifespan,
+        material,
+        quality,
+        maintenanceCostPerYear,
+        totalMaintenanceCost
+      }
+    };
+  }
+  // ...existing code for appliances...
 }
 
-// Display lifetime cost on the page
+// Display lifetime cost results on the page
 function displayLifetimeCost(productData, calculationResults) {
-  // Create container for our display
+  console.log('Displaying lifetime cost results:', calculationResults);
+
   const container = document.createElement('div');
-  container.id = 'lifetime-cost-calculator';
-  container.className = 'ltc-container';
-  
-  // Format currency values
-  const formatCurrency = (value) => {
-    if (typeof value !== 'number' || isNaN(value)) {
-      console.error('Invalid value passed to formatCurrency:', value);
-      return '€0,00'; // Default fallback
-    }
-    return '€' + value.toFixed(2).replace('.', ',');
-  };
-  
-  // Create content
-  container.innerHTML = `
-    <div class="ltc-header">LIFETIME COST CALCULATOR</div>
-    <div class="ltc-content">
-      <div class="ltc-total">
-        Total Cost of Ownership (${calculationResults.lifespan} years): 
-        <span class="ltc-highlight">${formatCurrency(calculationResults.totalLifetimeCost)}</span>
+  container.style.cssText = 'position:fixed;top:10px;right:10px;background:#fff;border:1px solid #ccc;padding:10px;z-index:10000;box-shadow:0 0 10px rgba(0,0,0,0.1);';
+
+  // Build content for clothing
+  if (calculationResults.productType === 'clothing') {
+    container.innerHTML = `
+      <div style="font-weight:700;font-size:1.2em;color:#0077b6;margin-bottom:10px;letter-spacing:1px;">LIFETIME COST CALCULATOR</div>
+      <div style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
+        <b style="flex:1;">${productData.name || 'Prodotto Zara'}</b>
+        <span style="font-weight:600;margin-left:10px;">${formatCurrency(productData.price)}</span>
       </div>
-      
-      <div class="ltc-breakdown">
-        <div class="ltc-breakdown-title">Breakdown:</div>
-        <div class="ltc-breakdown-item">
-          • Purchase Price: ${formatCurrency(calculationResults.purchasePrice)}
-        </div>
-        <div class="ltc-breakdown-item">
-          • Energy Cost (NPV): ${formatCurrency(calculationResults.energyCostNPV)}
-        </div>
-        <div class="ltc-breakdown-item">
-          • Maintenance (NPV): ${formatCurrency(calculationResults.maintenanceCostNPV)}
-        </div>
-      </div>
-      
-      <div class="ltc-energy-info">
-        Annual Energy Consumption: ${calculationResults.annualEnergyConsumption} kWh
-        <br>
-        Energy Efficiency Class: ${calculationResults.energyEfficiencyClass}
-      </div>
-      
-      <button class="ltc-details-button">Show Calculation Details</button>
-      <button class="ltc-save-button">Save This Product</button>
-    </div>
-  `;
-  
-  // Find a good place to insert our container
-  const targetElement = document.querySelector('.product-details, .product-info, .product-summary');
-  if (targetElement) {
-    targetElement.parentNode.insertBefore(container, targetElement.nextSibling);
-  } else {
-    // Fallback: insert after the first heading
-    const heading = document.querySelector('h1');
-    if (heading) {
-      heading.parentNode.insertBefore(container, heading.nextSibling);
-    } else {
-      // Last resort: append to body
-      document.body.appendChild(container);
-    }
+      <div style="margin-bottom:10px;">Materiale: <b>${calculationResults.material || 'N/A'}</b> (${calculationResults.quality || 'N/A'} quality)</div>
+      <div style="margin-bottom:10px;">Durata stimata: <b>${calculationResults.lifespan} anni</b></div>
+      <div style="margin-bottom:10px;">Costo annuale ammortizzato: <b>${formatCurrency(calculationResults.annualCost)}</b></div>
+      <div style="margin-bottom:10px;">Costo manutenzione annuale: <b>${formatCurrency(calculationResults.maintenanceCostPerYear)}</b></div>
+      <div style="margin-bottom:10px;">Costo totale manutenzione: <b>${formatCurrency(calculationResults.totalMaintenanceCost)}</b></div>
+      <div style="margin-bottom:10px;">Costo totale vita: <span style="font-size:1.2em;color:#009900;font-weight:700;">${formatCurrency(calculationResults.totalLifetimeCost)}</span></div>
+    `;
   }
-  
-  // Add event listener for the details button
-  const detailsButton = container.querySelector('.ltc-details-button');
-  detailsButton.addEventListener('click', () => {
-    showCalculationDetails(productData, calculationResults);
-  });
 
-  // Add event listener for the save button
-  const saveButton = container.querySelector('.ltc-save-button');
-  saveButton.addEventListener('click', () => {
-    saveProduct(productData, calculationResults);
-  });
+  document.body.appendChild(container);
 }
 
-// Show detailed calculation information
-function showCalculationDetails(productData, calculationResults) {
-  // Create modal for detailed information
-  const modal = document.createElement('div');
-  modal.className = 'ltc-modal';
-  
-  // Format currency values
-  const formatCurrency = (value) => {
-    return '€' + value.toFixed(2).replace('.', ',');
-  };
-  
-  // Create content
-  modal.innerHTML = `
-    <div class="ltc-modal-content">
-      <span class="ltc-modal-close">&times;</span>
-      <h2>Lifetime Cost Calculation Details</h2>
-      
-      <h3>Product Information</h3>
-      <p>
-        <strong>Name:</strong> ${productData.name}<br>
-        <strong>Price:</strong> ${formatCurrency(productData.price)}<br>
-        <strong>Energy Consumption:</strong> ${calculationResults.annualEnergyConsumption} kWh/year<br>
-        <strong>Energy Efficiency Class:</strong> ${calculationResults.energyEfficiencyClass}<br>
-        <strong>Expected Lifespan:</strong> ${calculationResults.lifespan} years
-      </p>
-      
-      <h3>Energy Costs</h3>
-      <p>
-        <strong>Annual Energy Cost:</strong> ${formatCurrency(calculationResults.annualEnergyCost)}<br>
-        <strong>Total Energy Cost (NPV):</strong> ${formatCurrency(calculationResults.energyCostNPV)}
-      </p>
-      
-      <h3>Maintenance Costs</h3>
-      <p>
-        <strong>Average Repair Cost Used:</strong> ${formatCurrency(calculationResults.averageRepairCostUsed)}<br>
-        <strong>Expected Number of Repairs:</strong> ${calculationResults.numRepairsUsed}<br>
-        <strong>Data Source:</strong> ${calculationResults.maintenanceDataSource}<br>
-        <strong>Total Maintenance Cost (NPV):</strong> ${formatCurrency(calculationResults.maintenanceCostNPV)}
-      </p>
-      
-      <h3>Total Lifetime Cost</h3>
-      <p>
-        <strong>Purchase Price:</strong> ${formatCurrency(calculationResults.purchasePrice)}<br>
-        <strong>Energy Cost (NPV):</strong> ${formatCurrency(calculationResults.energyCostNPV)}<br>
-        <strong>Maintenance Cost (NPV):</strong> ${formatCurrency(calculationResults.maintenanceCostNPV)}<br>
-        <strong>Total Lifetime Cost:</strong> ${formatCurrency(calculationResults.totalLifetimeCost)}
-      </p>
-      
-      <p class="ltc-note">
-        Note: All future costs are calculated using Net Present Value (NPV) to account for the time value of money.
-      </p>
-    </div>
-  `;
-  
-  // Add modal to page
-  document.body.appendChild(modal);
-  
-  // Add event listener for close button
-  const closeButton = modal.querySelector('.ltc-modal-close');
-  closeButton.addEventListener('click', () => {
-    document.body.removeChild(modal);
-  });
-  
-  // Close modal when clicking outside the content
-  modal.addEventListener('click', (event) => {
-    if (event.target === modal) {
-      document.body.removeChild(modal);
-    }
-  });
+// Helper function to format currency
+function formatCurrency(value) {
+  return new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(value);
 }
-
-// Save product to Chrome storage
-function saveProduct(productData, calculationResults) {
-  const productToSave = {
-    ...productData,
-    calculationResults,
-    savedAt: new Date().toISOString(),
-    url: window.location.href
-  };
-  chrome.storage.sync.get({ savedProducts: [] }, (result) => {
-    const savedProducts = result.savedProducts;
-    savedProducts.push(productToSave);
-    chrome.storage.sync.set({ savedProducts }, () => {
-      alert('Product saved!');
-    });
-  });
-}
-
-// Initialize the content script
-initLifetimeCostCalculator();

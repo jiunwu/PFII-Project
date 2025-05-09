@@ -165,11 +165,19 @@
   </div>
   
   <div id="content" class="content">
-    <!-- Content will be dynamically populated by JavaScript -->
-    <div class="no-product">
-      <div class="no-product-icon">🔍</div>
-      <p>No product detected on this page.</p>
-      <p>Navigate to a product page on saturn.de to see lifetime cost calculations.</p>
+    <div id="ltc-result-container" style="padding: 18px 18px 8px 18px; min-height: 220px;">
+      <!-- Content will be dynamically populated by JavaScript -->
+      <div class="no-product">
+        <div class="no-product-icon">🔍</div>
+        <p>No product detected on this page.</p>
+        <p>Navigate to a product page on saturn.de to see lifetime cost calculations.</p>
+      </div>
+      <div id="ltc-popup-content">
+        <h2>Lifetime Cost Calculator</h2>
+        <div id="ltc-product-info"></div>
+        <div id="ltc-cost-breakdown"></div>
+        <div id="ltc-error-message" style="color:red;"></div>
+      </div>
     </div>
   </div>
   

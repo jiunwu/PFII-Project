@@ -58,42 +58,106 @@ function updateStatusIndicator(isActive) {
 function displayProductData(productData, calculationResults) {
   const contentElement = document.getElementById('content');
   
-  // Format currency values
+  // Check if this is a car
+  const isCar = productData.productType === 'car';
+  
+  // Format currency values with appropriate currency symbol
   const formatCurrency = (value) => {
-    return '€' + value.toFixed(2).replace('.', ',');
+    if (isCar) {
+      return 'CHF ' + value.toFixed(2).replace('.', ',');
+    } else {
+      return '€' + value.toFixed(2).replace('.', ',');
+    }
   };
   
-  // Create content HTML
-  let html = `
-    <div class="product-info">
-      <div class="product-name">${productData.name}</div>
-      <div>${productData.productType ? capitalizeFirstLetter(productData.productType) : 'Appliance'}</div>
-    </div>
-    
-    <div class="cost-summary">
-      <div class="cost-item">
-        <span>Purchase Price:</span>
-        <span>${formatCurrency(calculationResults.purchasePrice)}</span>
+  // Create content HTML based on product type
+  let html = '';
+  
+  if (isCar) {
+    // Car-specific display
+    html = `
+      <div class="product-info">
+        <div class="product-name">${productData.year} ${productData.name}</div>
+        <div>${capitalizeFirstLetter(productData.carType || 'Car')}</div>
       </div>
-      <div class="cost-item">
-        <span>Energy Cost (${calculationResults.lifespan} years):</span>
-        <span>${formatCurrency(calculationResults.energyCostNPV)}</span>
+      
+      <div class="car-info">
+        <div class="car-detail">Mileage: ${productData.mileage} km</div>
+        <div class="car-detail">Fuel: ${capitalizeFirstLetter(productData.fuelType || 'Unknown')}</div>
+        <div class="car-detail">Consumption: ${productData.fuelConsumption} ${productData.fuelType === 'electric' ? 'kWh/100km' : 'L/100km'}</div>
       </div>
-      <div class="cost-item">
-        <span>Maintenance Cost:</span>
-        <span>${formatCurrency(calculationResults.maintenanceCostNPV)}</span>
+      
+      <div class="monthly-cost">
+        Monthly Cost: ${formatCurrency(calculationResults.monthlyCost)}
       </div>
-      <div class="cost-total">
-        <span>Total Lifetime Cost:</span>
-        <span class="highlight">${formatCurrency(calculationResults.totalLifetimeCost)}</span>
+      
+      <div class="cost-summary">
+        <div class="cost-item">
+          <span>Purchase Price:</span>
+          <span>${formatCurrency(calculationResults.purchasePrice)}</span>
+        </div>
+        <div class="cost-item">
+          <span>Depreciation (${calculationResults.ownershipDuration} years):</span>
+          <span>${formatCurrency(calculationResults.depreciationCost)}</span>
+        </div>
+        <div class="cost-item">
+          <span>Fuel Cost:</span>
+          <span>${formatCurrency(calculationResults.fuelCostNPV)}</span>
+        </div>
+        <div class="cost-item">
+          <span>Insurance:</span>
+          <span>${formatCurrency(calculationResults.insuranceCostNPV)}</span>
+        </div>
+        <div class="cost-item">
+          <span>Tax:</span>
+          <span>${formatCurrency(calculationResults.taxCostNPV)}</span>
+        </div>
+        <div class="cost-item">
+          <span>Maintenance:</span>
+          <span>${formatCurrency(calculationResults.maintenanceCostNPV)}</span>
+        </div>
+        <div class="cost-total">
+          <span>Total Ownership Cost:</span>
+          <span class="highlight">${formatCurrency(calculationResults.totalOwnershipCost)}</span>
+        </div>
       </div>
-    </div>
-    
-    <div>
-      <div>Annual Energy: ${calculationResults.annualEnergyConsumption} kWh</div>
-      <div>Energy Class: ${calculationResults.energyEfficiencyClass}</div>
-    </div>
-    
+    `;
+  } else {
+    // Appliance-specific display
+    html = `
+      <div class="product-info">
+        <div class="product-name">${productData.name}</div>
+        <div>${productData.productType ? capitalizeFirstLetter(productData.productType) : 'Appliance'}</div>
+      </div>
+      
+      <div class="cost-summary">
+        <div class="cost-item">
+          <span>Purchase Price:</span>
+          <span>${formatCurrency(calculationResults.purchasePrice)}</span>
+        </div>
+        <div class="cost-item">
+          <span>Energy Cost (${calculationResults.lifespan} years):</span>
+          <span>${formatCurrency(calculationResults.energyCostNPV)}</span>
+        </div>
+        <div class="cost-item">
+          <span>Maintenance Cost:</span>
+          <span>${formatCurrency(calculationResults.maintenanceCostNPV)}</span>
+        </div>
+        <div class="cost-total">
+          <span>Total Lifetime Cost:</span>
+          <span class="highlight">${formatCurrency(calculationResults.totalLifetimeCost)}</span>
+        </div>
+      </div>
+      
+      <div>
+        <div>Annual Energy: ${calculationResults.annualEnergyConsumption} kWh</div>
+        <div>Energy Class: ${calculationResults.energyEfficiencyClass}</div>
+      </div>
+    `;
+  }
+  
+  // Add buttons and settings section
+  html += `
     <button id="details-button" class="details-button">View Details</button>
     
     <div class="settings-section">
@@ -118,7 +182,7 @@ function displayNoProductMessage() {
     <div class="no-product">
       <div class="no-product-icon">🔍</div>
       <p>No product detected on this page.</p>
-      <p>Navigate to a product page on saturn.de to see lifetime cost calculations.</p>
+      <p>Navigate to a product page on saturn.de or a car listing on tutti.ch to see lifetime cost calculations.</p>
     </div>
     
     <div class="settings-section">
@@ -150,6 +214,25 @@ function displaySettings(preferences) {
       <span>${(preferences.discountRate * 100).toFixed(1)}%</span>
     </div>
   `;
+  
+  // Add car-specific settings if available
+  if (preferences.carOwnershipDuration) {
+    html += `
+      <div class="settings-item">
+        <span>Car Ownership:</span>
+        <span>${preferences.carOwnershipDuration} years</span>
+      </div>
+    `;
+  }
+  
+  if (preferences.annualMileage) {
+    html += `
+      <div class="settings-item">
+        <span>Annual Mileage:</span>
+        <span>${preferences.annualMileage} km</span>
+      </div>
+    `;
+  }
   
   settingsContentElement.innerHTML = html;
 }

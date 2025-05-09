@@ -23,7 +23,19 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://*.saturn.de/*/product/*", "https://*.saturn.de/de/product/*","https://saturn.de/de/product/*"],
+      "matches": [
+        "https://*.saturn.de/*/product/*", 
+        "https://*.saturn.de/de/product/*",
+        "https://saturn.de/de/product/*",
+        "https://*.tutti.ch/*/anzeige/*",
+        "https://tutti.ch/*/anzeige/*",
+        "https://*.tutti.ch/*/auto/*",
+        "https://tutti.ch/*/auto/*",
+        "https://*.tutti.ch/*/automobili/*",
+        "https://tutti.ch/*/automobili/*",
+        "https://*.tutti.ch/*/autos/*",
+        "https://tutti.ch/*/autos/*"
+      ],
       "js": ["content.js"],
       "css": ["content.css"],
       "run_at": "document_idle"
@@ -35,6 +47,7 @@
     "scripting"
   ],
   "host_permissions": [
-    "https://*.saturn.de/*"
+    "https://*.saturn.de/*",
+    "https://*.tutti.ch/*"
   ]
 }

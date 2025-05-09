@@ -1,5 +1,14 @@
 // content.js - Content script for Lifetime Cost Calculator Extension
 console.log('Lifetime Cost Calculator: Content script loaded');
+
+// Ensure digitecScraper is defined at the top level
+let digitecScraper = null;
+if (window.location.hostname.includes('digitec.ch')) {
+  if (window.DigitecScraper) {
+    digitecScraper = new window.DigitecScraper();
+  }
+}
+
 // Main function to initialize the content script
 async function initLifetimeCostCalculator() {
   console.log('Lifetime Cost Calculator: Content script initialized');
@@ -42,31 +51,39 @@ async function initLifetimeCostCalculator() {
 
 // Check if the current page is a product page
 async function isProductPage() {
-  // Check URL pattern
   const currentUrl = window.location.href;
+  if (currentUrl.includes('saturn.de')) {
+    if (!currentUrl.includes('/product/')) {
+      console.log('Not a Saturn product page based on URL');
+      return false;
+    }
+    return true;
+  } else if (currentUrl.includes('digitec.ch')) {
+    // Improved: check for product ID in URL and product title element
+    const productIdPattern = /-(\d+)(#|$|\?)/;
+    const hasProductId = productIdPattern.test(currentUrl);
+    const hasProductTitle = document.querySelector('h1[data-testid="product-title"], h1.product-title, .product-title, h1');
+    if (!hasProductId || !hasProductTitle) {
+      console.log('Not a Digitec product page based on URL or missing product title');
+      return false;
+    }
+    return true;
+  }
   if (!currentUrl.includes('/product/') && !currentUrl.includes('saturn.de')) {
     console.log('Not a product page based on URL');
     return false;
   }
-
-  // Use Gemini API to extract product data
   const pageText = document.body.innerText;
   const productData = await callGeminiAPIForProductData(pageText);
   if (!productData) {
     console.log('Gemini API did not return product data');
     return false;
   }
-  const productTitleElement = productData.name;
-  const priceElement = productData.price;
-  console.log('Product title element (Gemini):', productTitleElement);
-  console.log('Price element (Gemini):', priceElement);
-  if (!productTitleElement || !priceElement) {
-    console.log('Product title or price element not found in Gemini API result');
-    return false;
+  if (productData.name && productData.price) {
+    window._ltcGeminiProductData = productData;
+    return true;
   }
-  // Store productData for later use
-  window._ltcGeminiProductData = productData;
-  return true;
+  return false;
 }
 
 // Helper to call Gemini API for product data extraction
@@ -74,8 +91,9 @@ async function callGeminiAPIForProductData(pageText) {
   return new Promise((resolve, reject) => {
     chrome.storage.sync.get(['geminiApiKey'], async function(result) {
       const apiKey = result.geminiApiKey;
+      console.log('[LTC DEBUG] Loaded API key:', apiKey);
       if (!apiKey) {
-        console.error('Gemini API key not set.');
+        console.error('[LTC DEBUG] Gemini API key not set.');
         resolve(null);
         return;
       }
@@ -93,6 +111,7 @@ Return the result as a JSON object with keys: name, price, energyConsumption, en
 Text:
 ${pageText}`;
       try {
+        console.log('[LTC DEBUG] Sending Gemini API request:', url, prompt);
         const response = await fetch(url, {
           method: 'POST',
           headers: {
@@ -102,18 +121,25 @@ ${pageText}`;
             contents: [{ parts: [{ text: prompt }] }]
           })
         });
+        console.log('[LTC DEBUG] Gemini API response status:', response.status);
         const data = await response.json();
+        console.log('[LTC DEBUG] Gemini API raw response:', data);
         try {
-          // Remove markdown code block markers if present
-          let text = data.candidates[0].content.parts[0].text;
+          let text = data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts[0].text;
+          if (!text) {
+            console.error('[LTC DEBUG] Gemini API response missing expected text field:', data);
+            resolve(null);
+            return;
+          }
           text = text.replace(/```[a-zA-Z]*\n?|```/g, '').trim();
+          console.log('[LTC DEBUG] Gemini API parsed text:', text);
           resolve(JSON.parse(text));
         } catch (e) {
-          console.error('Gemini API response parsing error:', e, data);
+          console.error('[LTC DEBUG] Gemini API response parsing error:', e, data);
           resolve(null);
         }
       } catch (err) {
-        console.error('Error calling Gemini API:', err);
+        console.error('[LTC DEBUG] Error calling Gemini API:', err);
         resolve(null);
       }
     });
@@ -123,15 +149,21 @@ ${pageText}`;
 // Extract product data from the page using Gemini API
 async function extractProductData() {
   try {
+    const currentUrl = window.location.href;
+    if (currentUrl.includes('digitec.ch') && digitecScraper) {
+      const data = digitecScraper.extractProductData();
+      if (data && data.name && data.price) {
+        return data;
+      }
+    }
     const pageText = document.body.innerText;
     const productData = await callGeminiAPIForProductData(pageText);
     if (productData && productData.name && productData.price) {
-      console.log('Product data extracted:', productData);
       return productData;
     }
     return null;
   } catch (error) {
-    console.error('Error extracting product data with Gemini:', error);
+    console.error('Error extracting product data:', error);
     return null;
   }
 }

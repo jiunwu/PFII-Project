@@ -12,122 +12,167 @@ class ResultsUI {
     this.containerId = 'lifetime-cost-calculator';
     this.modalId = 'ltc-modal';
     this.chartId = 'ltc-cost-chart';
+    this.productData = null; // To store productData
+    this.calculationResults = null; // To store calculationResults
+    this.preferences = null; // To store preferences, if needed for display
+  }
+
+  /**
+   * Helper to format currency values.
+   * @param {number} value - The numeric value to format.
+   * @returns {string} Formatted currency string.
+   */
+  formatCurrency(value) {
+    const isCar = this.productData && this.productData.productType === 'car';
+    const currencySymbol = isCar ? 'CHF' : '€';
+    if (typeof value !== 'number' || isNaN(value)) return `${currencySymbol} 0,00`;
+    return `${currencySymbol} ` + value.toFixed(2).replace('.', ',');
   }
 
   /**
    * Display lifetime cost calculation results on the page
    * @param {Object} productData - Product data
    * @param {Object} calculationResults - Calculation results
+   * @param {Object} preferences - User preferences (optional, if needed for display details)
    */
-  displayResults(productData, calculationResults) {
+  displayResults(productData, calculationResults, preferences) {
+    this.productData = productData; // Store productData
+    this.calculationResults = JSON.parse(JSON.stringify(calculationResults)); // Store a deep copy of calculationResults
+    if (preferences) {
+        this.preferences = preferences; // Store preferences
+    }
+
     // Remove any existing container
     this.removeExistingContainer();
     
     // Create container for our display
     const container = document.createElement('div');
     container.id = this.containerId;
-    container.className = 'ltc-container';
+    container.className = 'ltc-container ltc-sidebar'; // Ensure sidebar class is also applied
     
     // Create content
-    container.innerHTML = this.createResultsHTML(productData, calculationResults);
+    container.innerHTML = this.createResultsHTML(); // Uses this.productData and this.calculationResults
     
     // Find a good place to insert our container
     this.insertContainer(container);
     
     // Add event listeners
-    this.addEventListeners(productData, calculationResults);
+    this.addEventListeners(); // Uses this.productData and this.calculationResults
   }
 
   /**
-   * Create HTML for the results display
-   * @param {Object} productData - Product data
-   * @param {Object} calculationResults - Calculation results
+   * Create HTML for the results display. Relies on this.productData and this.calculationResults.
    * @returns {string} HTML content
    */
-  createResultsHTML(productData, calculationResults) {
-    const isCar = productData.productType === 'car';
-    const currencySymbol = isCar ? 'CHF' : '€';
+  createResultsHTML() {
+    if (!this.productData || !this.calculationResults) return '';
 
-    // Format currency values
-    const formatCurrency = (value) => {
-      if (typeof value !== 'number' || isNaN(value)) return `${currencySymbol} 0,00`;
-      return `${currencySymbol} ` + value.toFixed(2).replace('.', ',');
-    };
+    const isCar = this.productData.productType === 'car';
     
     if (isCar) {
+      // Ensure all necessary car-specific fields exist in calculationResults, providing defaults if not
+      const results = {
+        ownershipDuration: this.calculationResults.ownershipDuration || 0,
+        totalOwnershipCost: this.calculationResults.totalOwnershipCost || 0,
+        monthlyCost: this.calculationResults.monthlyCost || 0,
+        purchasePrice: this.calculationResults.purchasePrice || 0,
+        depreciationCost: this.calculationResults.depreciationCost || 0,
+        fuelCostNPV: this.calculationResults.fuelCostNPV || 0, // This will be the editable one
+        taxCostNPV: this.calculationResults.taxCostNPV || 0,
+        insuranceCostNPV: this.calculationResults.insuranceCostNPV || 0,
+        maintenanceCostNPV: this.calculationResults.maintenanceCostNPV || 0,
+      };
+
       return `
         <div class="ltc-header">CAR OWNERSHIP COST CALCULATOR</div>
         <div class="ltc-content">
           <div class="ltc-total">
-            Total Cost of Ownership (${calculationResults.ownershipDuration} years): 
-            <span class="ltc-highlight">${formatCurrency(calculationResults.totalOwnershipCost)}</span>
+            Total Cost of Ownership (${results.ownershipDuration} years): 
+            <span class="ltc-highlight" id="ltc-total-ownership-cost">${this.formatCurrency(results.totalOwnershipCost)}</span>
           </div>
           <div class="ltc-monthly">
             Monthly Cost: 
-            <span class="ltc-highlight">${formatCurrency(calculationResults.monthlyCost)}</span>
+            <span class="ltc-highlight" id="ltc-monthly-cost">${this.formatCurrency(results.monthlyCost)}</span>
           </div>
           <div class="ltc-breakdown">
             <div class="ltc-breakdown-title">Breakdown:</div>
             <div class="ltc-breakdown-item">
-              • Purchase Price: ${formatCurrency(calculationResults.purchasePrice)}
+              • Purchase Price: ${this.formatCurrency(results.purchasePrice)}
             </div>
             <div class="ltc-breakdown-item">
-              • Depreciation: ${formatCurrency(calculationResults.depreciationCost)}
+              • Depreciation: ${this.formatCurrency(results.depreciationCost)}
+            </div>
+            <div class="ltc-breakdown-item ltc-editable-item">
+              • Fuel Cost (NPV): 
+              <input type="number" 
+                     id="ltc-editable-fuel-cost-npv" 
+                     class="ltc-editable-field" 
+                     value="${results.fuelCostNPV.toFixed(2)}" 
+                     step="1.00" 
+                     aria-label="Editable Fuel Cost NPV">
+              <span class="ltc-currency-symbol">${isCar ? 'CHF' : '€'}</span>
             </div>
             <div class="ltc-breakdown-item">
-              • Fuel Cost (NPV): ${formatCurrency(calculationResults.fuelCostNPV)}
+              • Tax (NPV): ${this.formatCurrency(results.taxCostNPV)}
             </div>
             <div class="ltc-breakdown-item">
-              • Tax (NPV): ${formatCurrency(calculationResults.taxCostNPV)}
+              • Insurance (NPV): ${this.formatCurrency(results.insuranceCostNPV)}
             </div>
             <div class="ltc-breakdown-item">
-              • Insurance (NPV): ${formatCurrency(calculationResults.insuranceCostNPV)}
-            </div>
-            <div class="ltc-breakdown-item">
-              • Maintenance (NPV): ${formatCurrency(calculationResults.maintenanceCostNPV)}
+              • Maintenance (NPV): ${this.formatCurrency(results.maintenanceCostNPV)}
             </div>
           </div>
           <div class="ltc-car-info">
-            ${productData.year} ${productData.name} • ${productData.mileage} km • ${productData.fuelType}
+            ${this.productData.year} ${this.productData.name} • ${this.productData.mileage} km • ${this.productData.fuelType}
             <br>
-            Fuel Consumption: ${productData.fuelConsumption} ${productData.fuelType === 'electric' ? 'kWh/100km' : 'L/100km'}
+            Fuel Consumption: ${this.productData.fuelConsumption} ${this.productData.fuelType === 'electric' ? 'kWh/100km' : 'L/100km'}
           </div>
           <button class="ltc-details-button">Show Calculation Details</button>
           <button class="ltc-save-button">Save This Car</button>
         </div>
       `;
     } else {
+      // Ensure all necessary appliance fields exist
+      const results = {
+        lifespan: this.calculationResults.lifespan || 0,
+        totalLifetimeCost: this.calculationResults.totalLifetimeCost || 0,
+        purchasePrice: this.calculationResults.purchasePrice || 0,
+        energyCostNPV: this.calculationResults.energyCostNPV || 0,
+        maintenanceCostNPV: this.calculationResults.maintenanceCostNPV || 0,
+        annualEnergyConsumption: this.calculationResults.annualEnergyConsumption || 0,
+        energyEfficiencyClass: this.calculationResults.energyEfficiencyClass || 'N/A',
+      };
       return `
-        <div class="ltc-header">LIFETIME COST CALCULATOR</div>
-        <div class="ltc-content">
-          <div class="ltc-total">
-            Total Cost of Ownership (${calculationResults.lifespan} years): 
-            <span class="ltc-highlight">${formatCurrency(calculationResults.totalLifetimeCost)}</span>
-          </div>
-          
-          <div class="ltc-breakdown">
-            <div class="ltc-breakdown-title">Breakdown:</div>
-            <div class="ltc-breakdown-item">
-              • Purchase Price: ${formatCurrency(calculationResults.purchasePrice)}
-            </div>
-            <div class="ltc-breakdown-item">
-              • Energy Cost (NPV): ${formatCurrency(calculationResults.energyCostNPV)}
-            </div>
-            <div class="ltc-breakdown-item">
-              • Maintenance (NPV): ${formatCurrency(calculationResults.maintenanceCostNPV)}
-            </div>
-          </div>
-          
-          <div class="ltc-energy-info">
-            Annual Energy Consumption: ${calculationResults.annualEnergyConsumption} kWh
-            <br>
-            Energy Efficiency Class: ${calculationResults.energyEfficiencyClass}
-          </div>
-          
-          <button class="ltc-details-button">Show Calculation Details</button>
-          <button class="ltc-save-button">Save This Product</button>
+      <div class="ltc-header">LIFETIME COST CALCULATOR</div>
+      <div class="ltc-content">
+        <div class="ltc-total">
+          Total Cost of Ownership (${results.lifespan} years): 
+          <span class="ltc-highlight">${this.formatCurrency(results.totalLifetimeCost)}</span>
         </div>
-      `;
+        
+        <div class="ltc-breakdown">
+          <div class="ltc-breakdown-title">Breakdown:</div>
+          <div class="ltc-breakdown-item">
+            • Purchase Price: ${this.formatCurrency(results.purchasePrice)}
+          </div>
+          <div class="ltc-breakdown-item">
+            • Energy Cost (NPV): ${this.formatCurrency(results.energyCostNPV)}
+          </div>
+          <div class="ltc-breakdown-item">
+            • Maintenance (NPV): ${this.formatCurrency(results.maintenanceCostNPV)}
+          </div>
+        </div>
+        
+        <div class="ltc-energy-info">
+          Annual Energy Consumption: ${results.annualEnergyConsumption} kWh
+          <br>
+          Energy Efficiency Class: ${results.energyEfficiencyClass}
+        </div>
+        
+        <button class="ltc-details-button">Show Calculation Details</button>
+          <button class="ltc-save-button">Save This Product</button>
+      </div>
+    `;
     }
   }
 
@@ -150,188 +195,240 @@ class ResultsUI {
   }
 
   /**
-   * Add event listeners to the UI elements
-   * @param {Object} productData - Product data
-   * @param {Object} calculationResults - Calculation results
+   * Add event listeners to the UI elements. Relies on this.productData and this.calculationResults.
    */
-  addEventListeners(productData, calculationResults) {
+  addEventListeners() {
+    if (!this.productData || !this.calculationResults) return;
+
     const detailsButton = document.querySelector(`#${this.containerId} .ltc-details-button`);
     if (detailsButton) {
       detailsButton.addEventListener('click', () => {
-        this.showDetailsModal(productData, calculationResults);
+        this.showDetailsModal(); // Uses internal data
       });
     }
 
     const saveButton = document.querySelector(`#${this.containerId} .ltc-save-button`);
     if (saveButton) {
         saveButton.addEventListener('click', () => {
-            // The saveProduct function would be defined in content.js or imported
             if (typeof saveProduct === 'function') {
-                saveProduct(productData, calculationResults);
+                saveProduct(this.productData, this.calculationResults); // Use internal data
             } else {
-                console.error('saveProduct function not found. Make sure it is available in the scope.');
-                 // Fallback or direct implementation if needed
-                 const productToSave = {
-                    ...productData,
-                    calculationResults,
+                console.error('saveProduct function not found.');
+                // Fallback save
+                const productToSave = {
+                    ...this.productData,
+                    calculationResults: this.calculationResults,
                     savedAt: new Date().toISOString(),
                     url: window.location.href
-                  };
-                  chrome.storage.sync.get({ savedProducts: [] }, (result) => {
+                };
+                chrome.storage.sync.get({ savedProducts: [] }, (result) => {
                     const savedProducts = result.savedProducts;
                     savedProducts.push(productToSave);
                     chrome.storage.sync.set({ savedProducts }, () => {
                       alert('Product saved! (Fallback save)');
                     });
-                  });
+                });
             }
         });
+    }
+
+    // Event listener for editable fuel cost NPV field (only if it's a car)
+    if (this.productData.productType === 'car') {
+        const fuelCostInput = document.getElementById('ltc-editable-fuel-cost-npv');
+        if (fuelCostInput) {
+            fuelCostInput.addEventListener('input', (event) => {
+                const newFuelCostNPV = parseFloat(event.target.value);
+                if (!isNaN(newFuelCostNPV) && newFuelCostNPV >= 0) {
+                    this.recalculateAndUpdateDisplay(newFuelCostNPV);
+                } else if (event.target.value === '') {
+                    // Handle empty input as 0 or revert to original, for now let's use 0
+                    this.recalculateAndUpdateDisplay(0);
+                } 
+            });
+             fuelCostInput.addEventListener('blur', (event) => { // Format on blur
+                const value = parseFloat(event.target.value);
+                if (!isNaN(value)) {
+                    event.target.value = value.toFixed(2);
+                }
+            });
+        }
     }
     
     // Listen for messages from popup
     chrome.runtime.onMessage.addListener((message) => {
+      if (!this.productData) return; // Don't act if no product context
       if (message.type === 'SHOW_DETAILS') {
-        this.showDetailsModal(productData, calculationResults);
+        this.showDetailsModal();
       }
       
       if (message.type === 'PREFERENCES_UPDATED') {
-        // Recalculate with new preferences
-        this.handlePreferencesUpdate(productData);
+        this.handlePreferencesUpdate();
       }
     });
   }
 
   /**
-   * Show detailed calculation information in a modal
-   * @param {Object} productData - Product data
-   * @param {Object} calculationResults - Calculation results
+   * Recalculate total and monthly costs based on a new fuel cost NPV and update the display.
+   * @param {number} newFuelCostNPV - The new fuel cost NPV from user input.
    */
-  showDetailsModal(productData, calculationResults) {
-    // Remove any existing modal
-    this.removeExistingModal();
+  recalculateAndUpdateDisplay(newFuelCostNPV) {
+    if (!this.calculationResults || this.productData.productType !== 'car') return;
+
+    this.calculationResults.fuelCostNPV = newFuelCostNPV;
+
+    // Recalculate total ownership cost
+    // totalOwnershipCost = totalDepreciation + fuelCostNPV + taxNPV + insuranceNPV + maintenanceNPV;
+    this.calculationResults.totalOwnershipCost = 
+        (this.calculationResults.depreciationCost || 0) +
+        newFuelCostNPV + 
+        (this.calculationResults.taxCostNPV || 0) + 
+        (this.calculationResults.insuranceCostNPV || 0) + 
+        (this.calculationResults.maintenanceCostNPV || 0);
+
+    // Recalculate monthly cost
+    if (this.calculationResults.ownershipDuration && this.calculationResults.ownershipDuration > 0) {
+        this.calculationResults.monthlyCost = this.calculationResults.totalOwnershipCost / (this.calculationResults.ownershipDuration * 12);
+    } else {
+        this.calculationResults.monthlyCost = 0; // Avoid division by zero
+    }
+
+    this.updateDisplayedCosts();
+  }
+
+  /**
+   * Update the displayed total and monthly costs in the UI.
+   */
+  updateDisplayedCosts() {
+    if (!this.calculationResults || this.productData.productType !== 'car') return;
+
+    const totalCostEl = document.getElementById('ltc-total-ownership-cost');
+    if (totalCostEl) {
+        totalCostEl.textContent = this.formatCurrency(this.calculationResults.totalOwnershipCost);
+    }
+
+    const monthlyCostEl = document.getElementById('ltc-monthly-cost');
+    if (monthlyCostEl) {
+        monthlyCostEl.textContent = this.formatCurrency(this.calculationResults.monthlyCost);
+    }
     
-    // Create modal
+    // If modal is open, update its chart (or relevant parts)
+    const modal = document.getElementById(this.modalId);
+    if (modal && modal.style.display !== 'none') {
+        // For now, just re-render the chart. More granular updates could be done.
+        this.createCostChart(); 
+    }
+  }
+
+  /**
+   * Show detailed calculation information in a modal
+   */
+  showDetailsModal() {
+    if (!this.productData || !this.calculationResults) return;
+    this.removeExistingModal();
     const modal = document.createElement('div');
     modal.id = this.modalId;
     modal.className = 'ltc-modal';
     
-    const isCar = productData.productType === 'car';
-    const currencySymbol = isCar ? 'CHF' : '€';
-
-    // Format currency values
-    const formatCurrency = (value) => {
-      if (typeof value !== 'number' || isNaN(value)) return `${currencySymbol} 0,00`;
-      return `${currencySymbol} ` + value.toFixed(2).replace('.', ',');
-    };
+    const isCar = this.productData.productType === 'car';
+    // currencySymbol is now derived within this.formatCurrency
     
     let modalHTML = '';
     if (isCar) {
+        // Use this.calculationResults which includes the potentially edited fuelCostNPV
+        const results = this.calculationResults;
+        const product = this.productData;
         modalHTML = `
         <div class="ltc-modal-content">
           <span class="ltc-modal-close">&times;</span>
           <h2>Car Ownership Cost Calculation Details</h2>
-          
           <h3>Car Information</h3>
           <p>
-            <strong>Make/Model:</strong> ${productData.name}<br>
-            <strong>Year:</strong> ${productData.year} (Age: ${calculationResults.carDetails.age} years)<br>
-            <strong>Mileage:</strong> ${productData.mileage} km<br>
-            <strong>Fuel Type:</strong> ${productData.fuelType}<br>
-            <strong>Fuel Consumption:</strong> ${productData.fuelConsumption} ${productData.fuelType === 'electric' ? 'kWh/100km' : 'L/100km'}<br>
-            <strong>Engine Size:</strong> ${productData.engineSize || 'Unknown'}<br>
-            <strong>Transmission:</strong> ${productData.transmission || 'Unknown'}
+            <strong>Make/Model:</strong> ${product.name}<br>
+            <strong>Year:</strong> ${product.year} (Age: ${results.carDetails ? results.carDetails.age : 'N/A'} years)<br>
+            <strong>Mileage:</strong> ${product.mileage} km<br>
+            <strong>Fuel Type:</strong> ${product.fuelType}<br>
+            <strong>Fuel Consumption:</strong> ${product.fuelConsumption} ${product.fuelType === 'electric' ? 'kWh/100km' : 'L/100km'}<br>
+            <strong>Engine Size:</strong> ${product.engineSize || 'Unknown'}<br>
+            <strong>Transmission:</strong> ${product.transmission || 'Unknown'}
           </p>
-          
           <h3>Annual Costs</h3>
           <p>
-            <strong>Depreciation:</strong> ${formatCurrency(calculationResults.annualDepreciation)}/year<br>
-            <strong>Fuel:</strong> ${formatCurrency(calculationResults.annualFuelCost)}/year<br>
-            <strong>Tax:</strong> ${formatCurrency(calculationResults.annualTax)}/year<br>
-            <strong>Insurance:</strong> ${formatCurrency(calculationResults.annualInsurance)}/year<br>
-            <strong>Maintenance:</strong> ${formatCurrency(calculationResults.annualMaintenanceCost)}/year
+            <strong>Depreciation:</strong> ${this.formatCurrency(results.annualDepreciation)}/year<br>
+            <strong>Fuel:</strong> ${this.formatCurrency(results.annualFuelCost)}/year<br>
+            <strong>Tax:</strong> ${this.formatCurrency(results.annualTax)}/year<br>
+            <strong>Insurance:</strong> ${this.formatCurrency(results.annualInsurance)}/year<br>
+            <strong>Maintenance:</strong> ${this.formatCurrency(results.annualMaintenanceCost)}/year
           </p>
-          
-          <h3>Total Costs (${calculationResults.ownershipDuration} years)</h3>
+          <h3>Total Costs (${results.ownershipDuration} years)</h3>
           <p>
-            <strong>Purchase Price:</strong> ${formatCurrency(calculationResults.purchasePrice)}<br>
-            <strong>Depreciation:</strong> ${formatCurrency(calculationResults.depreciationCost)}<br>
-            <strong>Fuel (NPV):</strong> ${formatCurrency(calculationResults.fuelCostNPV)}<br>
-            <strong>Tax (NPV):</strong> ${formatCurrency(calculationResults.taxCostNPV)}<br>
-            <strong>Insurance (NPV):</strong> ${formatCurrency(calculationResults.insuranceCostNPV)}<br>
-            <strong>Maintenance (NPV):</strong> ${formatCurrency(calculationResults.maintenanceCostNPV)}<br>
-            <strong>Total Ownership Cost:</strong> ${formatCurrency(calculationResults.totalOwnershipCost)}<br>
-            <strong>Monthly Cost:</strong> ${formatCurrency(calculationResults.monthlyCost)}
+            <strong>Purchase Price:</strong> ${this.formatCurrency(results.purchasePrice)}<br>
+            <strong>Depreciation:</strong> ${this.formatCurrency(results.depreciationCost)}<br>
+            <strong>Fuel (NPV):</strong> ${this.formatCurrency(results.fuelCostNPV)} <!-- Reflects edited value -->
+            <br>
+            <strong>Tax (NPV):</strong> ${this.formatCurrency(results.taxCostNPV)}<br>
+            <strong>Insurance (NPV):</strong> ${this.formatCurrency(results.insuranceCostNPV)}<br>
+            <strong>Maintenance (NPV):</strong> ${this.formatCurrency(results.maintenanceCostNPV)}<br>
+            <strong>Total Ownership Cost:</strong> ${this.formatCurrency(results.totalOwnershipCost)}<br>
+            <strong>Monthly Cost:</strong> ${this.formatCurrency(results.monthlyCost)}
           </p>
-
           <div id="${this.chartId}" class="ltc-chart"></div>
-          
           <p class="ltc-note">
-            Note: All future costs are calculated using Net Present Value (NPV) to account for the time value of money.
-            The discount rate used is ${(calculationResults.discountRate || preferences.discountRate || 0.02) * 100}%.
+            Note: All future costs are calculated using Net Present Value (NPV).
+            Discount rate: ${( (this.preferences ? this.preferences.discountRate : null) || results.discountRate || 0.02) * 100}%. 
+            User-edited fields may affect overall NPV accuracy if other components are not also NPV.
           </p>
         </div>
       `;
     } else {
+        const results = this.calculationResults;
+        const product = this.productData;
         modalHTML = `
-        <div class="ltc-modal-content">
-          <span class="ltc-modal-close">&times;</span>
-          <h2>Lifetime Cost Calculation Details</h2>
-          
-          <h3>Product Information</h3>
-          <p>
-            <strong>Name:</strong> ${productData.name}<br>
-            <strong>Price:</strong> ${formatCurrency(calculationResults.purchasePrice)}<br>
-            <strong>Energy Consumption:</strong> ${calculationResults.annualEnergyConsumption} kWh/year<br>
-            <strong>Energy Efficiency Class:</strong> ${calculationResults.energyEfficiencyClass}<br>
-            <strong>Expected Lifespan:</strong> ${calculationResults.lifespan} years
-          </p>
-          
-          <h3>Energy Costs</h3>
-          <p>
-            <strong>Annual Energy Cost:</strong> ${formatCurrency(calculationResults.annualEnergyCost)}<br>
-            <strong>Total Energy Cost (NPV):</strong> ${formatCurrency(calculationResults.energyCostNPV)}
-          </p>
-          
-          <h3>Maintenance Costs</h3>
-          <p>
-            <strong>Average Repair Cost Used:</strong> ${formatCurrency(calculationResults.averageRepairCostUsed)}<br>
-            <strong>Expected Number of Repairs:</strong> ${calculationResults.numRepairsUsed}<br>
-            <strong>Data Source:</strong> ${calculationResults.maintenanceDataSource}<br>
-            <strong>Total Maintenance Cost (NPV):</strong> ${formatCurrency(calculationResults.maintenanceCostNPV)}
-          </p>
-          
-          <h3>Total Lifetime Cost</h3>
-          <p>
-            <strong>Purchase Price:</strong> ${formatCurrency(calculationResults.purchasePrice)}<br>
-            <strong>Energy Cost (NPV):</strong> ${formatCurrency(calculationResults.energyCostNPV)}<br>
-            <strong>Maintenance Cost (NPV):</strong> ${formatCurrency(calculationResults.maintenanceCostNPV)}<br>
-            <strong>Total Lifetime Cost:</strong> ${formatCurrency(calculationResults.totalLifetimeCost)}
-          </p>
-          
-          <div id="${this.chartId}" class="ltc-chart"></div>
-          
-          <p class="ltc-note">
-            Note: All future costs are calculated using Net Present Value (NPV) to account for the time value of money.
-            The discount rate used is ${(calculationResults.discountRate || preferences.discountRate || 0.02) * 100}%.
-          </p>
-        </div>
-      `;
+      <div class="ltc-modal-content">
+        <span class="ltc-modal-close">&times;</span>
+        <h2>Lifetime Cost Calculation Details</h2>
+        <h3>Product Information</h3>
+        <p>
+          <strong>Name:</strong> ${product.name}<br>
+          <strong>Price:</strong> ${this.formatCurrency(results.purchasePrice)}<br>
+          <strong>Energy Consumption:</strong> ${results.annualEnergyConsumption} kWh/year<br>
+          <strong>Energy Efficiency Class:</strong> ${results.energyEfficiencyClass}<br>
+          <strong>Expected Lifespan:</strong> ${results.lifespan} years
+        </p>
+        <h3>Energy Costs</h3>
+        <p>
+          <strong>Annual Energy Cost:</strong> ${this.formatCurrency(results.annualEnergyCost)}<br>
+          <strong>Total Energy Cost (NPV):</strong> ${this.formatCurrency(results.energyCostNPV)}
+        </p>
+        <h3>Maintenance Costs</h3>
+        <p>
+            <strong>Average Repair Cost Used:</strong> ${this.formatCurrency(results.averageRepairCostUsed)}<br>
+            <strong>Expected Number of Repairs:</strong> ${results.numRepairsUsed}<br>
+            <strong>Data Source:</strong> ${results.maintenanceDataSource}<br>
+            <strong>Total Maintenance Cost (NPV):</strong> ${this.formatCurrency(results.maintenanceCostNPV)}
+        </p>
+        <h3>Total Lifetime Cost</h3>
+        <p>
+          <strong>Purchase Price:</strong> ${this.formatCurrency(results.purchasePrice)}<br>
+          <strong>Energy Cost (NPV):</strong> ${this.formatCurrency(results.energyCostNPV)}<br>
+          <strong>Maintenance Cost (NPV):</strong> ${this.formatCurrency(results.maintenanceCostNPV)}<br>
+          <strong>Total Lifetime Cost:</strong> ${this.formatCurrency(results.totalLifetimeCost)}
+        </p>
+        <div id="${this.chartId}" class="ltc-chart"></div>
+        <p class="ltc-note">
+          Note: All future costs are calculated using Net Present Value (NPV).
+          Discount rate: ${((this.preferences ? this.preferences.discountRate : null) || results.discountRate || 0.02) * 100}%. 
+        </p>
+      </div>
+    `;
     }
     modal.innerHTML = modalHTML;
-    
-    // Add modal to page
     document.body.appendChild(modal);
+    this.createCostChart(); // Uses internal data
     
-    // Create chart
-    this.createCostChart(productData, calculationResults);
-    
-    // Add event listeners
     const closeButton = modal.querySelector('.ltc-modal-close');
     closeButton.addEventListener('click', () => {
       document.body.removeChild(modal);
     });
-    
-    // Close modal when clicking outside the content
     modal.addEventListener('click', (event) => {
       if (event.target === modal) {
         document.body.removeChild(modal);
@@ -341,43 +438,38 @@ class ResultsUI {
 
   /**
    * Create a chart visualizing the cost breakdown
-   * @param {Object} productData - Product data (to determine type)
-   * @param {Object} calculationResults - Calculation results
    */
-  createCostChart(productData, calculationResults) {
+  createCostChart() {
+    if (!this.productData || !this.calculationResults) return;
     const chartContainer = document.getElementById(this.chartId);
     if (!chartContainer) return;
-
-    const isCar = productData.productType === 'car';
-    const currencySymbol = isCar ? 'CHF' : '€';
+    
+    const isCar = this.productData.productType === 'car';
+    const results = this.calculationResults; // Use the potentially updated results
 
     let chartHTML = '';
 
     if (isCar) {
-        const total = calculationResults.totalOwnershipCost;
-        const purchasePercentage = (calculationResults.purchasePrice / total) * 100;
-        const depreciationPercentage = (calculationResults.depreciationCost / total) * 100;
-        const fuelPercentage = (calculationResults.fuelCostNPV / total) * 100;
-        const taxPercentage = (calculationResults.taxCostNPV / total) * 100;
-        const insurancePercentage = (calculationResults.insuranceCostNPV / total) * 100;
-        const maintenancePercentage = (calculationResults.maintenanceCostNPV / total) * 100;
+        const total = results.totalOwnershipCost;
+        // Ensure total is not zero to prevent division by zero errors for percentages
+        const safeTotal = total || 1; 
+        const purchasePercentage = (results.purchasePrice / safeTotal) * 100;
+        const depreciationPercentage = (results.depreciationCost / safeTotal) * 100;
+        const fuelPercentage = (results.fuelCostNPV / safeTotal) * 100; // Reflects edited value
+        const taxPercentage = (results.taxCostNPV / safeTotal) * 100;
+        const insurancePercentage = (results.insuranceCostNPV / safeTotal) * 100;
+        const maintenancePercentage = (results.maintenanceCostNPV / safeTotal) * 100;
 
         chartHTML = `
         <div class="ltc-chart-title">Car Cost Breakdown</div>
         <div class="ltc-chart-container">
             <div class="ltc-chart-bar">
-            <div class="ltc-chart-segment ltc-purchase" style="width: ${purchasePercentage}%;" 
-                title="Purchase Price: ${currencySymbol}${calculationResults.purchasePrice.toFixed(2)}"></div>
-            <div class="ltc-chart-segment ltc-depreciation" style="width: ${depreciationPercentage}%;" 
-                title="Depreciation: ${currencySymbol}${calculationResults.depreciationCost.toFixed(2)}"></div>
-            <div class="ltc-chart-segment ltc-fuel" style="width: ${fuelPercentage}%;" 
-                title="Fuel Cost: ${currencySymbol}${calculationResults.fuelCostNPV.toFixed(2)}"></div>
-            <div class="ltc-chart-segment ltc-tax" style="width: ${taxPercentage}%;" 
-                title="Tax: ${currencySymbol}${calculationResults.taxCostNPV.toFixed(2)}"></div>
-            <div class="ltc-chart-segment ltc-insurance" style="width: ${insurancePercentage}%;" 
-                title="Insurance: ${currencySymbol}${calculationResults.insuranceCostNPV.toFixed(2)}"></div>
-            <div class="ltc-chart-segment ltc-maintenance" style="width: ${maintenancePercentage}%;" 
-                title="Maintenance Cost: ${currencySymbol}${calculationResults.maintenanceCostNPV.toFixed(2)}"></div>
+            <div class="ltc-chart-segment ltc-purchase" style="width: ${purchasePercentage.toFixed(1)}%;" title="Purchase Price: ${this.formatCurrency(results.purchasePrice)}"></div>
+            <div class="ltc-chart-segment ltc-depreciation" style="width: ${depreciationPercentage.toFixed(1)}%;" title="Depreciation: ${this.formatCurrency(results.depreciationCost)}"></div>
+            <div class="ltc-chart-segment ltc-fuel" style="width: ${fuelPercentage.toFixed(1)}%;" title="Fuel Cost: ${this.formatCurrency(results.fuelCostNPV)}"></div>
+            <div class="ltc-chart-segment ltc-tax" style="width: ${taxPercentage.toFixed(1)}%;" title="Tax: ${this.formatCurrency(results.taxCostNPV)}"></div>
+            <div class="ltc-chart-segment ltc-insurance" style="width: ${insurancePercentage.toFixed(1)}%;" title="Insurance: ${this.formatCurrency(results.insuranceCostNPV)}"></div>
+            <div class="ltc-chart-segment ltc-maintenance" style="width: ${maintenancePercentage.toFixed(1)}%;" title="Maintenance Cost: ${this.formatCurrency(results.maintenanceCostNPV)}"></div>
             </div>
         </div>
         <div class="ltc-chart-legend">
@@ -390,100 +482,64 @@ class ResultsUI {
         </div>
         `;
     } else {
-        const total = calculationResults.totalLifetimeCost;
-        const purchasePercentage = (calculationResults.purchasePrice / total) * 100;
-        const energyPercentage = (calculationResults.energyCostNPV / total) * 100;
-        const maintenancePercentage = (calculationResults.maintenanceCostNPV / total) * 100;
+        const total = results.totalLifetimeCost;
+        const safeTotal = total || 1;
+        const purchasePercentage = (results.purchasePrice / safeTotal) * 100;
+        const energyPercentage = (results.energyCostNPV / safeTotal) * 100;
+        const maintenancePercentage = (results.maintenanceCostNPV / safeTotal) * 100;
         
         chartHTML = `
         <div class="ltc-chart-title">Appliance Cost Breakdown</div>
-        <div class="ltc-chart-container">
-            <div class="ltc-chart-bar">
-            <div class="ltc-chart-segment ltc-purchase" style="width: ${purchasePercentage}%;" 
-                title="Purchase Price: ${currencySymbol}${calculationResults.purchasePrice.toFixed(2)}"></div>
-            <div class="ltc-chart-segment ltc-energy" style="width: ${energyPercentage}%;" 
-                title="Energy Cost: ${currencySymbol}${calculationResults.energyCostNPV.toFixed(2)}"></div>
-            <div class="ltc-chart-segment ltc-maintenance" style="width: ${maintenancePercentage}%;" 
-                title="Maintenance Cost: ${currencySymbol}${calculationResults.maintenanceCostNPV.toFixed(2)}"></div>
+      <div class="ltc-chart-container">
+        <div class="ltc-chart-bar">
+          <div class="ltc-chart-segment ltc-purchase" style="width: ${purchasePercentage.toFixed(1)}%;" title="Purchase Price: ${this.formatCurrency(results.purchasePrice)}"></div>
+          <div class="ltc-chart-segment ltc-energy" style="width: ${energyPercentage.toFixed(1)}%;" title="Energy Cost: ${this.formatCurrency(results.energyCostNPV)}"></div>
+          <div class="ltc-chart-segment ltc-maintenance" style="width: ${maintenancePercentage.toFixed(1)}%;" title="Maintenance Cost: ${this.formatCurrency(results.maintenanceCostNPV)}"></div>
             </div>
-        </div>
-        <div class="ltc-chart-legend">
-            <div class="ltc-legend-item">
-            <div class="ltc-legend-color ltc-purchase"></div>
-            <div class="ltc-legend-label">Purchase (${Math.round(purchasePercentage)}%)</div>
-            </div>
-            <div class="ltc-legend-item">
-            <div class="ltc-legend-color ltc-energy"></div>
-            <div class="ltc-legend-label">Energy (${Math.round(energyPercentage)}%)</div>
-            </div>
-            <div class="ltc-legend-item">
-            <div class="ltc-legend-color ltc-maintenance"></div>
-            <div class="ltc-legend-label">Maintenance (${Math.round(maintenancePercentage)}%)</div>
-            </div>
-        </div>
-        `;
+      </div>
+      <div class="ltc-chart-legend">
+        <div class="ltc-legend-item"><div class="ltc-legend-color ltc-purchase"></div><div class="ltc-legend-label">Purchase (${Math.round(purchasePercentage)}%)</div></div>
+        <div class="ltc-legend-item"><div class="ltc-legend-color ltc-energy"></div><div class="ltc-legend-label">Energy (${Math.round(energyPercentage)}%)</div></div>
+        <div class="ltc-legend-item"><div class="ltc-legend-color ltc-maintenance"></div><div class="ltc-legend-label">Maintenance (${Math.round(maintenancePercentage)}%)</div></div>
+      </div>
+    `;
     }
     chartContainer.innerHTML = chartHTML;
   }
 
   /**
    * Handle preferences update by recalculating and updating the display
-   * @param {Object} productData - Product data
    */
-  handlePreferencesUpdate(productData) {
-    // Get updated preferences
+  handlePreferencesUpdate() {
+    if (!this.productData) return;
     chrome.runtime.sendMessage({ type: 'GET_PREFERENCES' }, (response) => {
       if (response && response.preferences) {
-        // Create calculator with new preferences
-        // This assumes LifetimeCalculator is globally available or imported in content.js
-        let calculator;
-        if (typeof LifetimeCalculator !== 'undefined') {
-             calculator = new LifetimeCalculator(response.preferences);
-        } else {
-            console.error("LifetimeCalculator class not found. Ensure it's loaded.");
-            // As a fallback, try to use the functions directly if they are global
-            // This part of the logic might need to be in content.js where calculateLifetimeCost is defined
-            if (productData.productType === 'car' && typeof calculateCarLifetimeCost === 'function') {
-                const newResults = calculateCarLifetimeCost(productData, response.preferences);
-                this.displayResults(productData, newResults);
-                 chrome.runtime.sendMessage({ type: 'PRODUCT_DETECTED', productData: productData, calculationResults: newResults });
-            } else if (typeof calculateLifetimeCost === 'function') {
-                const newResults = calculateLifetimeCost(productData, response.preferences);
-                this.displayResults(productData, newResults);
-                chrome.runtime.sendMessage({ type: 'PRODUCT_DETECTED', productData: productData, calculationResults: newResults });
-            }
-            return; // Exit if calculator can't be created
-        }
+        this.preferences = response.preferences; // Store/update preferences
         
-        // Recalculate based on product type
+        // Decide which calculation function to call based on productType
+        // This assumes calculateCarLifetimeCost and calculateLifetimeCost are available globally (in content.js)
         let newResults;
-        if (productData.productType === 'car') {
-            if(typeof calculator.calculateCarLifetimeCost === 'function'){
-                 newResults = calculator.calculateCarLifetimeCost(productData);
-            } else if (typeof calculateCarLifetimeCost === 'function') {
-                 newResults = calculateCarLifetimeCost(productData, response.preferences); // Fallback to global
-            } else {
-                console.error("calculateCarLifetimeCost method not found on calculator or globally");
-                return;
-            }
+        if (this.productData.productType === 'car') {
+          if (typeof calculateCarLifetimeCost === 'function') {
+            newResults = calculateCarLifetimeCost(this.productData, this.preferences);
+          } else {
+            console.error("calculateCarLifetimeCost function is not defined."); return;
+          }
         } else {
-            if(typeof calculator.calculateLifetimeCost === 'function'){
-                newResults = calculator.calculateLifetimeCost(productData);
-            } else if (typeof calculateLifetimeCost === 'function'){
-                newResults = calculateLifetimeCost(productData, response.preferences); // Fallback to global
-            } else {
-                 console.error("calculateLifetimeCost method not found on calculator or globally");
-                return;
-            }
+          if (typeof calculateLifetimeCost === 'function') {
+            newResults = calculateLifetimeCost(this.productData, this.preferences);
+          } else {
+            console.error("calculateLifetimeCost function is not defined."); return;
+          }
         }
         
-        // Update display
-        this.displayResults(productData, newResults);
+        // Update the display with new results
+        this.displayResults(this.productData, newResults, this.preferences);
         
-        // Update stored results
+        // Notify background script about the update
         chrome.runtime.sendMessage({ 
           type: 'PRODUCT_DETECTED',
-          productData: productData,
+          productData: this.productData,
           calculationResults: newResults
         });
       }

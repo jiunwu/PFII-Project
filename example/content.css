@@ -114,6 +114,33 @@
   margin-bottom: 5px;
 }
 
+/* Style for the editable item container if needed */
+.ltc-editable-item {
+    display: flex; /* Align label, input, and currency symbol */
+    align-items: center;
+    gap: 5px; /* Space between elements */
+}
+
+.ltc-editable-field {
+    width: 80px; /* Adjust width as needed */
+    padding: 4px 6px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 13px;
+    text-align: right;
+}
+
+.ltc-editable-field:focus {
+    border-color: #4CAF50;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+}
+
+.ltc-currency-symbol {
+    font-size: 13px;
+    color: #555;
+}
+
 /* Energy information */
 .ltc-energy-info {
   margin-bottom: 15px;

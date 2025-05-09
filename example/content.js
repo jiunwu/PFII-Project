@@ -38,7 +38,7 @@ async function initLifetimeCostCalculator() {
             displayCarLifetimeCost(productData, calculationResults);
           } else {
             console.log('Displaying appliance lifetime cost...');
-            displayLifetimeCost(productData, calculationResults);
+          displayLifetimeCost(productData, calculationResults);
           }
 
           // Notify background script that a product was detected

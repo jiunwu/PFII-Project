@@ -1,14 +1,40 @@
 /* content.css - Styles for the Lifetime Cost Calculator UI */
 
-/* Main container */
+/* Main container - Old styles, will be overridden by .ltc-sidebar */
 .ltc-container {
   font-family: Arial, sans-serif;
-  margin: 20px 0;
-  border: 2px solid #4CAF50;
+  margin: 20px 0; /* Remove or adjust for sidebar */
+  border: 2px solid #4CAF50; /* Keep for sidebar, or adjust */
+  border-radius: 8px; /* Keep for sidebar */
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); /* Keep for sidebar */
+  /* max-width: 600px; */ /* Remove or adjust for sidebar width */
+  background-color: #fff; /* Keep for sidebar */
+  box-sizing: border-box; /* Add for consistency */
+}
+
+/* New Sidebar Styles */
+.ltc-sidebar {
+  position: fixed;
+  top: 20px; /* Adjust as needed */
+  right: 20px; /* Adjust as needed */
+  width: 380px; /* Adjust as needed */
+  max-height: 90vh; /* Max height relative to viewport height */
+  overflow-y: auto; /* Add scroll if content exceeds max-height */
+  overflow-x: hidden; /* Prevent horizontal scrollbar on the sidebar itself */
+  background-color: #f9f9f9; /* Light background for the sidebar */
+  border: 1px solid #ccc;
   border-radius: 8px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-  max-width: 600px;
-  background-color: #fff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 10000; /* High z-index to stay on top */
+  padding: 0; /* Remove default padding, header/content will have their own */
+  box-sizing: border-box; /* Crucial for fixed width */
+}
+
+/* Ensure the .ltc-container styles don't conflict heavily if both are applied 
+   (though ideally only .ltc-sidebar specific styles would apply via the class) */
+.ltc-sidebar.ltc-container {
+    margin: 0; /* Override margin from .ltc-container */
+    border-width: 1px; /* Example: override if needed */
 }
 
 /* Header */
@@ -18,14 +44,37 @@
   padding: 10px 15px;
   font-weight: bold;
   font-size: 16px;
-  border-top-left-radius: 6px;
-  border-top-right-radius: 6px;
+  border-top-left-radius: 8px; /* Match sidebar radius */
+  border-top-right-radius: 8px; /* Match sidebar radius */
+  box-sizing: border-box; /* Add for padding calculation */
+  /* For sticky header within scrolling sidebar, if desired later:
+  position: sticky;
+  top: 0;
+  z-index: 1; 
+  */
 }
 
 /* Content area */
 .ltc-content {
   padding: 15px;
+  box-sizing: border-box; /* Ensure padding doesn't expand it beyond sidebar width */
+  overflow-x: hidden; /* Prevent horizontal scroll within the content area */
+  /* Styles for content within the sidebar */
 }
+
+/* General text elements within the sidebar that might overflow */
+.ltc-sidebar .product-name,
+.ltc-sidebar .ltc-breakdown-item,
+.ltc-sidebar .ltc-energy-info,
+.ltc-sidebar .ltc-car-info,
+.ltc-sidebar .ltc-total,
+.ltc-sidebar .ltc-monthly,
+.ltc-sidebar p { /* Target p tags within the modal as well for consistency */
+    word-wrap: break-word; /* For older browsers */
+    overflow-wrap: break-word; /* Standard property */
+    /* white-space: normal; */ /* Ensure text wraps, default but can be overridden */
+}
+
 
 /* Total cost display */
 .ltc-total {
@@ -77,78 +126,80 @@
   margin-bottom: 15px;
   font-size: 14px;
   color: #555;
-  background-color: #f9f9f9;
+  background-color: #f0f0f0; /* Slightly different from main sidebar bg for emphasis */
   padding: 10px;
   border-radius: 4px;
 }
 
 /* Button styles */
-.ltc-details-button {
-  background-color: #4CAF50;
+.ltc-details-button,
+.ltc-save-button {
   color: white;
   border: none;
-  padding: 8px 15px;
+  padding: 10px 15px; /* Increased padding for better clickability */
   text-align: center;
   text-decoration: none;
-  display: inline-block;
+  display: block; /* Make buttons full width within their container */
+  width: 100%; /* Simpler full width, padding handled by box-sizing on .ltc-content */
+  margin: 10px 0; /* Adjust margin, no auto needed if width is 100% of parent */
   font-size: 14px;
-  margin: 4px 2px;
   cursor: pointer;
   border-radius: 4px;
   transition: background-color 0.3s;
+  box-sizing: border-box;
+}
+
+.ltc-details-button {
+  background-color: #4CAF50;
+}
+
+.ltc-save-button {
+  background-color: #2196F3; 
 }
 
 .ltc-details-button:hover {
   background-color: #45a049;
 }
 
-/* Save button styles */
-.ltc-save-button {
-  background-color: #2196F3;
-  color: white;
-  border: none;
-  padding: 8px 15px;
-  text-align: center;
-  text-decoration: none;
-  display: inline-block;
-  font-size: 14px;
-  margin: 4px 2px;
-  cursor: pointer;
-  border-radius: 4px;
-  transition: background-color 0.3s;
-}
-
 .ltc-save-button:hover {
   background-color: #0b7dda;
 }
 
-/* Modal styles */
+
+/* Modal styles - these should still work as intended */
 .ltc-modal {
-  display: block;
+  display: block; /* Should be toggled by JS (e.g., display: flex or display: block) */
   position: fixed;
-  z-index: 9999;
+  z-index: 10001; /* Higher than sidebar */
   left: 0;
   top: 0;
   width: 100%;
   height: 100%;
-  overflow: auto;
-  background-color: rgba(0, 0, 0, 0.4);
+  overflow: auto; 
+  background-color: rgba(0,0,0,0.4);
+  box-sizing: border-box;
 }
 
 .ltc-modal-content {
   background-color: #fefefe;
-  margin: 10% auto;
+  margin: 10% auto; 
   padding: 20px;
   border: 1px solid #888;
-  width: 80%;
-  max-width: 600px;
+  width: 90%; /* More responsive width */
+  max-width: 500px; /* Max width for larger screens */
   border-radius: 8px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+  position: relative; /* For positioning the close button */
+  box-sizing: border-box;
+  overflow-wrap: break-word; /* Ensure content in modal also wraps */
 }
 
 .ltc-modal-close {
   color: #aaa;
-  float: right;
+  /* float: right; */ /* Avoid float, use absolute positioning */
+  position: absolute;
+  top: 10px;
+  right: 15px;
   font-size: 28px;
   font-weight: bold;
   cursor: pointer;
@@ -167,15 +218,110 @@
   margin-top: 20px;
 }
 
+/* Chart styles within Modal */
+.ltc-chart-title {
+    font-weight: bold;
+    margin-bottom: 10px;
+    text-align: center;
+}
+
+.ltc-chart-container {
+    width: 100%;
+    margin-bottom: 10px;
+}
+
+.ltc-chart-bar {
+    display: flex;
+    height: 20px;
+    border-radius: 4px;
+    overflow: hidden; /* Ensures segments stay within rounded corners */
+}
+
+.ltc-chart-segment {
+    height: 100%;
+    /* Transition for width changes can be added if data updates dynamically */
+    /* transition: width 0.5s ease-in-out; */
+}
+
+/* Define colors for chart segments - can be expanded */
+.ltc-purchase { background-color: #76c7c0; } /* Tealish */
+.ltc-energy { background-color: #ffb74d; }   /* Orange */
+.ltc-maintenance { background-color: #81c784; } /* Green */
+.ltc-depreciation { background-color: #64b5f6; } /* Blue */
+.ltc-fuel { background-color: #ffd54f; }      /* Yellow */
+.ltc-tax { background-color: #e57373; }        /* Reddish */
+.ltc-insurance { background-color: #ba68c8; }  /* Purple */
+
+.ltc-chart-legend {
+    display: flex;
+    flex-wrap: wrap; /* Allow legend items to wrap */
+    justify-content: center;
+    font-size: 12px;
+}
+
+.ltc-legend-item {
+    display: flex;
+    align-items: center;
+    margin-right: 15px;
+    margin-bottom: 5px; /* Space for wrapped items */
+}
+
+.ltc-legend-color {
+    width: 12px;
+    height: 12px;
+    margin-right: 5px;
+    border-radius: 2px;
+}
+
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
-  .ltc-container {
-    margin: 15px 10px;
-    max-width: 100%;
+  /* .ltc-container is now .ltc-sidebar, adjust if needed */
+  .ltc-sidebar {
+    width: 320px; /* Slightly narrower for smaller screens */
+    right: 10px;
+    top: 10px;
+    max-height: 85vh; /* Adjust if needed */
   }
   
   .ltc-modal-content {
-    width: 90%;
-    margin: 20% auto;
+    width: 95%;
+    margin: 15% auto; /* Adjust vertical margin */
+    padding: 15px;
   }
+
+  .ltc-details-button,
+  .ltc-save-button {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 480px) {
+    .ltc-sidebar {
+        width: calc(100% - 20px); /* Full width minus some margin */
+        left: 10px;
+        right: 10px;
+        bottom: 10px; /* Consider placing at bottom on very small screens */
+        top: auto; /* Override top if placing at bottom */
+        max-height: 50vh; /* Adjust for bottom placement */
+    }
+
+    .ltc-header {
+        font-size: 14px;
+        padding: 8px 10px;
+    }
+
+    .ltc-content {
+        padding: 10px;
+    }
+
+    .ltc-highlight {
+        font-size: 16px;
+    }
+
+    .ltc-modal-content {
+        margin: 10% auto;
+        padding: 10px;
+    }
 }

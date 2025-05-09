@@ -102,8 +102,31 @@ function renderLifetimeCostCalculator(productData, calculationResults) {
 
 // Helper to format currency
 function formatCurrency(value) {
-  if (value === undefined || value === null || isNaN(value)) return 'N/A';
-  return new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(value);
+  if (typeof value !== 'number' || isNaN(value)) {
+    console.error('Invalid value passed to formatCurrency:', value);
+    return '€0,00'; // Default fallback
+  }
+  
+  // Check if we have product data with currency info
+  if (productData && productData.originalCurrency) {
+    const currency = productData.originalCurrency;
+    const formattedValue = value.toFixed(2).replace('.', ',');
+    
+    switch (currency) {
+      case 'CHF':
+        return 'CHF ' + formattedValue;
+      case 'USD':
+        return '$' + formattedValue;
+      case 'GBP':
+        return '£' + formattedValue;
+      case 'EUR':
+      default:
+        return '€' + formattedValue;
+    }
+  }
+  
+  // Default to EUR if no currency info available
+  return '€' + value.toFixed(2).replace('.', ',');
 }
 
 // On popup load, render the latest product/calculation results
@@ -141,6 +164,30 @@ function displayProductData(productData, calculationResults) {
   
   // Format currency values
   const formatCurrency = (value) => {
+    if (typeof value !== 'number' || isNaN(value)) {
+      console.error('Invalid value passed to formatCurrency:', value);
+      return '€0,00'; // Default fallback
+    }
+    
+    // Check if we have product data with currency info
+    if (productData && productData.originalCurrency) {
+      const currency = productData.originalCurrency;
+      const formattedValue = value.toFixed(2).replace('.', ',');
+      
+      switch (currency) {
+        case 'CHF':
+          return 'CHF ' + formattedValue;
+        case 'USD':
+          return '$' + formattedValue;
+        case 'GBP':
+          return '£' + formattedValue;
+        case 'EUR':
+        default:
+          return '€' + formattedValue;
+      }
+    }
+    
+    // Default to EUR if no currency info available
     return '€' + value.toFixed(2).replace('.', ',');
   };
   
@@ -199,7 +246,7 @@ function displayNoProductMessage() {
     <div class="no-product">
       <div class="no-product-icon">🔍</div>
       <p>No product detected on this page.</p>
-      <p>Navigate to a product page on saturn.de to see lifetime cost calculations.</p>
+      <p>Navigate to a product page on saturn.de or zara.com to see lifetime cost calculations.</p>
     </div>
     
     <div class="settings-section">

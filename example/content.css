@@ -35,6 +35,13 @@
   border-bottom: 1px solid #eee;
 }
 
+/* Monthly cost display for cars */
+.ltc-monthly {
+  font-size: 16px;
+  margin-bottom: 15px;
+  color: #444;
+}
+
 .ltc-highlight {
   font-weight: bold;
   color: #4CAF50;
@@ -65,6 +72,16 @@
   color: #555;
 }
 
+/* Car information */
+.ltc-car-info {
+  margin-bottom: 15px;
+  font-size: 14px;
+  color: #555;
+  background-color: #f9f9f9;
+  padding: 10px;
+  border-radius: 4px;
+}
+
 /* Button styles */
 .ltc-details-button {
   background-color: #4CAF50;
@@ -83,6 +100,26 @@
 
 .ltc-details-button:hover {
   background-color: #45a049;
+}
+
+/* Save button styles */
+.ltc-save-button {
+  background-color: #2196F3;
+  color: white;
+  border: none;
+  padding: 8px 15px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  font-size: 14px;
+  margin: 4px 2px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background-color 0.3s;
+}
+
+.ltc-save-button:hover {
+  background-color: #0b7dda;
 }
 
 /* Modal styles */

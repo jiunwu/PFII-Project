@@ -13,7 +13,13 @@ chrome.runtime.onInstalled.addListener(() => {
           washingMachine: 8,
           dishwasher: 9,
           dryer: 8
-        }
+        },
+        // Car-specific settings
+        carOwnershipDuration: 5, // years
+        annualMileage: 15000, // km per year
+        gasolinePrice: 1.90, // CHF per liter
+        dieselPrice: 1.95, // CHF per liter
+        electricityRate: 0.25 // CHF per kWh for EVs
       };
       
       chrome.storage.sync.set({ preferences: defaultPreferences });
@@ -76,7 +82,10 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     // Check if the URL matches a product page pattern
     const isProductPage = tab.url.match(/saturn\.de\/.*\/product\//);
     
-    if (isProductPage) {
+    // Check for tutti.ch car pages
+    const isTuttiCarPage = tab.url.match(/tutti\.ch\/.*\/(auto|automobili|autos)\//);
+    
+    if (isProductPage || isTuttiCarPage) {
       console.log('Product page detected:', tab.url);
       // The content script will be automatically injected based on the manifest.json matches
       console.log('Injecting content script into tab:', tabId);

@@ -34,7 +34,10 @@
         "https://*.tutti.ch/*/automobili/*",
         "https://tutti.ch/*/automobili/*",
         "https://*.tutti.ch/*/autos/*",
-        "https://tutti.ch/*/autos/*"
+        "https://tutti.ch/*/autos/*",
+        "https://www.digitec.ch/*/product/*", 
+        "https://www.digitec.ch/de/*/product/*", 
+        "https://digitec.ch/de/*/product/*"
       ],
       "js": ["content.js"],
       "css": ["content.css"],
@@ -48,6 +51,7 @@
   ],
   "host_permissions": [
     "https://*.saturn.de/*",
+    "https://*.digitec.ch/*"
     "https://*.tutti.ch/*"
   ]
 }

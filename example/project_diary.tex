@@ -1,0 +1,62 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{enumitem}
+\usepackage{geometry}
+\geometry{a4paper, margin=1in}
+\title{Project Diary: Lifetime Cost Calculator Extension}
+\author{Greta FUMI \\ Jiun-Yi WU \\ Eray AKYOL}
+\date{02.04.2025 -- 09.05.2025}
+
+\begin{document}
+\maketitle
+
+\section*{Introduction}
+This diary documents the development process of the Lifetime Cost Calculator Chrome extension, which calculates and displays the lifetime costs of products (including energy and maintenance) on e-commerce sites. The diary covers the period from 02.04.2025 to 09.05.2025, detailing the steps, decisions, and tools used.
+
+\section*{Project Diary}
+\begin{itemize}
+  \item[\textbf{02.04.2025}] Project Kickoff.\\
+  Initial project planning, requirements gathering, and setup of the project repository. Defined the main goal: a Chrome extension to estimate product lifetime costs on saturn.de.
+
+  \item[\textbf{05.04.2025}] Initial Extension Skeleton.\\
+  Created the basic Chrome extension structure: \texttt{manifest.json}, \texttt{content.js}, \texttt{popup.html}, and \texttt{options.html}. Set up permissions and content scripts for saturn.de product pages.
+
+  \item[\textbf{10.04.2025}] Product Data Extraction for Saturn.\\
+  Developed \texttt{saturn_scraper.js} to extract product name, price, and energy data from saturn.de. Integrated this with the content script.
+
+  \item[\textbf{15.04.2025}] Lifetime Cost Calculation Logic.\\
+  Implemented \texttt{lifetime_calculator.js} to compute energy and maintenance costs over the product lifespan. Added user preferences for electricity rate, discount rate, and appliance lifespans.
+
+  \item[\textbf{20.04.2025}] Popup UI and Options Page.\\
+  Designed the popup interface (\texttt{popup.html}, \texttt{popup.js}) to display results. Built the options page for user settings and Gemini API key input.
+
+  \item[\textbf{25.04.2025}] Gemini API Integration.\\
+  Integrated Google Gemini API for fallback product data extraction using page text. Added debug logging for API requests and responses.
+
+  \item[\textbf{28.04.2025}] Testing and Debugging.\\
+  Tested extension on saturn.de. Fixed issues with product detection, message passing, and error handling in \texttt{options.js} and \texttt{content.js}.
+
+  \item[\textbf{01.05.2025}] Support for digitec.ch.\\
+  Extended \texttt{manifest.json} to include digitec.ch. Created \texttt{digitec_scraper.js} for product extraction on digitec.ch. Updated \texttt{content.js} to detect digitec.ch product pages and use the new scraper.
+
+  \item[\textbf{03.05.2025}] Improved Product Page Detection.\\
+  Enhanced logic in \texttt{content.js} to reliably detect product pages on both saturn.de and digitec.ch, including URL and DOM checks.
+
+  \item[\textbf{06.05.2025}] Error Handling and Debugging.\\
+  Added more robust error handling and debug output in \texttt{content.js} and \texttt{options.js}. Addressed issues with undefined variables and message passing.
+
+  \item[\textbf{09.05.2025}] Final Testing and Documentation.\\
+  Tested the extension on both supported sites. Created this project diary in LaTeX for documentation and reproducibility. Prepared the project for Overleaf compilation.
+\end{itemize}
+
+\section*{Tools Used}
+\begin{itemize}
+  \item \textbf{Visual Studio Code} -- Main development environment
+  \item \textbf{Chrome Extensions API} -- For browser integration
+  \item \textbf{Google Gemini API} -- For AI-based product data extraction
+  \item \textbf{JavaScript, HTML, CSS} -- Core technologies
+  \item \textbf{Overleaf} -- For collaborative LaTeX documentation
+  \item \textbf{Git} -- Version control
+\end{itemize}
+
+\end{document}

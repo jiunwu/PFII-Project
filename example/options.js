@@ -51,6 +51,23 @@ function loadSavedPreferences() {
       document.getElementById('washingMachineLifespan').value = preferences.applianceLifespans.washingMachine;
       document.getElementById('dishwasherLifespan').value = preferences.applianceLifespans.dishwasher;
       document.getElementById('dryerLifespan').value = preferences.applianceLifespans.dryer;
+      
+      // Set car-specific settings
+      if (document.getElementById('carOwnershipDuration') && preferences.carOwnershipDuration) {
+        document.getElementById('carOwnershipDuration').value = preferences.carOwnershipDuration;
+      }
+      
+      if (document.getElementById('annualMileage') && preferences.annualMileage) {
+        document.getElementById('annualMileage').value = preferences.annualMileage;
+      }
+      
+      if (document.getElementById('gasolinePrice') && preferences.gasolinePrice) {
+        document.getElementById('gasolinePrice').value = preferences.gasolinePrice;
+      }
+      
+      if (document.getElementById('dieselPrice') && preferences.dieselPrice) {
+        document.getElementById('dieselPrice').value = preferences.dieselPrice;
+      }
     }
   });
 }
@@ -85,6 +102,23 @@ function savePreferences() {
       dryer: getValidatedNumberInput('dryerLifespan', 1, 20, 8)
     }
   };
+  
+  // Add car-specific settings
+  if (document.getElementById('carOwnershipDuration')) {
+    preferences.carOwnershipDuration = getValidatedNumberInput('carOwnershipDuration', 1, 15, 5);
+  }
+  
+  if (document.getElementById('annualMileage')) {
+    preferences.annualMileage = getValidatedNumberInput('annualMileage', 1000, 50000, 15000);
+  }
+  
+  if (document.getElementById('gasolinePrice')) {
+    preferences.gasolinePrice = getValidatedNumberInput('gasolinePrice', 0.1, 5, 1.90);
+  }
+  
+  if (document.getElementById('dieselPrice')) {
+    preferences.dieselPrice = getValidatedNumberInput('dieselPrice', 0.1, 5, 1.95);
+  }
   
   // Save to storage
   chrome.storage.sync.set({ preferences: preferences }, function() {

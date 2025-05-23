@@ -25,8 +25,16 @@
     {
       "matches": [
         "https://*.saturn.de/*/product/*", 
-        "https://*.saturn.de/de/product/*", 
+        "https://*.saturn.de/de/product/*",
         "https://saturn.de/de/product/*",
+        "https://*.tutti.ch/*/anzeige/*",
+        "https://tutti.ch/*/anzeige/*",
+        "https://*.tutti.ch/*/auto/*",
+        "https://tutti.ch/*/auto/*",
+        "https://*.tutti.ch/*/automobili/*",
+        "https://tutti.ch/*/automobili/*",
+        "https://*.tutti.ch/*/autos/*",
+        "https://tutti.ch/*/autos/*",
         "https://www.digitec.ch/*/product/*", 
         "https://www.digitec.ch/de/*/product/*", 
         "https://digitec.ch/de/*/product/*"
@@ -44,5 +52,6 @@
   "host_permissions": [
     "https://*.saturn.de/*",
     "https://*.digitec.ch/*"
+    "https://*.tutti.ch/*"
   ]
 }

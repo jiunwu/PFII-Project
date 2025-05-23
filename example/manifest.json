@@ -51,7 +51,7 @@
   ],
   "host_permissions": [
     "https://*.saturn.de/*",
-    "https://*.digitec.ch/*"
+    "https://*.digitec.ch/*",
     "https://*.tutti.ch/*"
   ]
 }

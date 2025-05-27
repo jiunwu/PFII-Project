@@ -1,26 +1,26 @@
 // popup.js - Script for the extension popup UI
 
 document.addEventListener('DOMContentLoaded', function () {
-  // Request the latest product and calculation results from background/content script
+  // Request the latest product and calculation results from background.js
   chrome.runtime.sendMessage({ type: 'GET_LAST_PRODUCT' }, (response) => {
-    if (response && response.productData && response.calculationResults) {
-      displayProductInfo(response.productData, response.calculationResults);
-    } else {
-      document.getElementById('ltc-error-message').textContent = 'No product data available. Visit a product page.';
+    const productData = response ? response.productData : null;
+    const calculationResults = response ? response.calculationResults : null;
+
+    renderLifetimeCostCalculator(productData, calculationResults);
+    updateStatusIndicator(productData != null);
+
+    const errorElement = document.getElementById('ltc-error-message');
+    if (errorElement) {
+      if (productData) {
+        errorElement.textContent = ''; // Clear error if data is present
+      } else {
+        // renderLifetimeCostCalculator should handle the main "no product" message.
+        // This could be a fallback or a more general status.
+        // errorElement.textContent = 'No product data. Navigate to a supported page and reopen popup.';
+      }
     }
   });
 
-  // Check if we have product data to display
-  chrome.storage.local.get(['currentProduct', 'calculationResults'], function(data) {
-    updateStatusIndicator(data.currentProduct != null);
-    
-    if (data.currentProduct && data.calculationResults) {
-      displayProductData(data.currentProduct, data.calculationResults);
-    } else {
-      displayNoProductMessage();
-    }
-  });
-  
   // Get user preferences for displaying settings
   chrome.storage.sync.get('preferences', function(data) {
     if (data.preferences) {
@@ -28,7 +28,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
   });
   
-  // Add event listener for settings button
+  // Add event listener for settings and details buttons
   document.addEventListener('click', function(event) {
     if (event.target.id === 'settings-button') {
       chrome.runtime.openOptionsPage();
@@ -36,17 +36,27 @@ document.addEventListener('DOMContentLoaded', function () {
     
     if (event.target.id === 'details-button') {
       chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-        chrome.tabs.sendMessage(tabs[0].id, {type: 'SHOW_DETAILS'});
+        // Ensure tabs[0] and tabs[0].id exist before sending a message
+        if (tabs && tabs.length > 0 && tabs[0] && tabs[0].id) {
+          chrome.tabs.sendMessage(tabs[0].id, {type: 'SHOW_DETAILS'});
+        }
       });
     }
   });
 });
 
 // Listen for messages from the content script and update popup state
+// This listener helps if the popup is already open when a product is detected.
+// For the "refresh on reload" scenario, GET_LAST_PRODUCT on DOMContentLoaded is key.
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'PRODUCT_DETECTED') {
+    // Storing in localStorage here might be for a specific purpose,
+    // but primary rendering on open relies on GET_LAST_PRODUCT.
     localStorage.setItem('ltc_productData', JSON.stringify(message.productData));
     localStorage.setItem('ltc_calculationResults', JSON.stringify(message.calculationResults));
+    // Optionally, if the popup is open, re-render immediately:
+    // renderLifetimeCostCalculator(message.productData, message.calculationResults);
+    // updateStatusIndicator(message.productData != null);
   }
 });
 
@@ -129,14 +139,6 @@ function formatCurrency(value) {
   return '€' + value.toFixed(2).replace('.', ',');
 }
 
-// On popup load, render the latest product/calculation results
-window.addEventListener('DOMContentLoaded', function() {
-  chrome.storage.local.get(['latestProductData', 'latestCalculationResults'], function(result) {
-    console.log('Retrieved from storage:', result);
-    renderLifetimeCostCalculator(result.latestProductData, result.latestCalculationResults);
-  });
-});
-
 /**
  * Update the status indicator in the popup
  * @param {boolean} isActive - Whether the extension is active on the current page
@@ -167,39 +169,11 @@ function displayProductData(productData, calculationResults) {
   
   // Format currency values with appropriate currency symbol
   const formatCurrency = (value) => {
-<<<<<<< HEAD
-    if (typeof value !== 'number' || isNaN(value)) {
-      console.error('Invalid value passed to formatCurrency:', value);
-      return '€0,00'; // Default fallback
-    }
-    
-    // Check if we have product data with currency info
-    if (productData && productData.originalCurrency) {
-      const currency = productData.originalCurrency;
-      const formattedValue = value.toFixed(2).replace('.', ',');
-      
-      switch (currency) {
-        case 'CHF':
-          return 'CHF ' + formattedValue;
-        case 'USD':
-          return '$' + formattedValue;
-        case 'GBP':
-          return '£' + formattedValue;
-        case 'EUR':
-        default:
-          return '€' + formattedValue;
-      }
-    }
-    
-    // Default to EUR if no currency info available
-    return '€' + value.toFixed(2).replace('.', ',');
-=======
     if (isCar) {
       return 'CHF ' + value.toFixed(2).replace('.', ',');
     } else {
       return '€' + value.toFixed(2).replace('.', ',');
     }
->>>>>>> origin/main
   };
   
   // Create content HTML based on product type
@@ -292,11 +266,7 @@ function displayProductData(productData, calculationResults) {
   html += `
     <button id="details-button" class="details-button">View Details</button>
     
-    <div class="settings-section">
-      <div class="settings-title">Settings</div>
-      <div id="settings-content">
-        <!-- Settings will be populated here -->
-      </div>
+    <div class="settings-section">           
       <button id="settings-button" class="settings-button">Open Settings</button>
     </div>
   `;
@@ -314,18 +284,10 @@ function displayNoProductMessage() {
     <div class="no-product">
       <div class="no-product-icon">🔍</div>
       <p>No product detected on this page.</p>
-<<<<<<< HEAD
-      <p>Navigate to a product page on saturn.de or zara.com to see lifetime cost calculations.</p>
-=======
       <p>Navigate to a product page on saturn.de or a car listing on tutti.ch to see lifetime cost calculations.</p>
->>>>>>> origin/main
     </div>
     
-    <div class="settings-section">
-      <div class="settings-title">Settings</div>
-      <div id="settings-content">
-        <!-- Settings will be populated here -->
-      </div>
+    <div class="settings-section"> 
       <button id="settings-button" class="settings-button">Open Settings</button>
     </div>
   `;

@@ -65,20 +65,34 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
   
   if (message.type === 'NO_PRODUCT') {
-    // Update extension icon to indicate inactive state
-    chrome.action.setBadgeText({ 
-      text: 'OFF',
-      tabId: sender.tab && sender.tab.id
+    console.log('NO_PRODUCT message received from tab:', sender.tab ? sender.tab.id : 'unknown');
+    const tabId = sender.tab ? sender.tab.id : null;
+
+    if (tabId) {
+      chrome.action.setBadgeText({ text: 'OFF', tabId: tabId });
+      chrome.action.setBadgeBackgroundColor({ color: '#757575', tabId: tabId });
+    }
+
+    // Only clear the global/popup-visible data if the message is from the active tab
+    chrome.tabs.query({ active: true, currentWindow: true }, (activeTabs) => {
+      if (activeTabs && activeTabs.length > 0 && tabId && activeTabs[0].id === tabId) {
+        console.log('NO_PRODUCT from active tab. Clearing global product data.');
+        lastProductData = null;
+        lastCalculationResults = null;
+        chrome.storage.local.remove(['currentProduct', 'calculationResults']);
+      } else if (!tabId && activeTabs.length === 0) {
+        // Fallback if tabId is not available but we are sure it's not a tab context (e.g. service worker itself)
+        // Or if we want to be more aggressive (though current logic is safer for multi-tab)
+        console.log('NO_PRODUCT from non-tab context or no active tab. Clearing global product data.');
+        lastProductData = null;
+        lastCalculationResults = null;
+        chrome.storage.local.remove(['currentProduct', 'calculationResults']);
+      }
+      else {
+        console.log('NO_PRODUCT from non-active tab or tabId unknown. Global product data remains unchanged.');
+      }
     });
-    chrome.action.setBadgeBackgroundColor({ 
-      color: '#757575',
-      tabId: sender.tab && sender.tab.id
-    });
-    
-    // Clear stored product data
-    chrome.storage.local.remove(['currentProduct', 'calculationResults']);
-    
-    return;
+    return; // No sendResponse needed
   }
 
   if (message.type === 'GET_LAST_PRODUCT') {
@@ -92,6 +106,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 // Listen for tab updates to check if we're on a product page
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  // When an active tab starts loading, clear its stale data
+  if (changeInfo.status === 'loading') {
+    chrome.tabs.query({ active: true, currentWindow: true }, (activeTabs) => {
+      if (activeTabs && activeTabs.length > 0 && activeTabs[0].id === tabId) {
+        console.log(`Active tab ${tabId} started loading. Clearing lastProductData.`);
+        lastProductData = null;
+        lastCalculationResults = null;
+        chrome.storage.local.remove(['currentProduct', 'calculationResults']);
+        // Reset badge for this tab
+        chrome.action.setBadgeText({ text: '', tabId: tabId });
+        chrome.action.setBadgeBackgroundColor({ color: '#757575', tabId: tabId }); // Default/inactive color
+      }
+    });
+  }
+
   if (changeInfo.status === 'complete' && tab.url) {
     // Check if the URL matches a product page pattern
     const isProductPage = tab.url.match(/saturn\.de\/.*\/product\//) || tab.url.match(/zara\.com\/.*\/product\//);

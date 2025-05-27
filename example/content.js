@@ -110,7 +110,9 @@ async function isProductPage() {
     console.log('Detected Zara site');
     
     // Check URL patterns for Zara product pages
-    if (currentUrl.includes('/product/') || currentUrl.includes('/item/')) {
+    // Added pattern for ...-p<product_id>.html
+    const zaraProductPagePattern = /-p[0-9]+\.html/i;
+    if (currentUrl.includes('/product/') || currentUrl.includes('/item/') || zaraProductPagePattern.test(currentUrl)) {
       console.log('Zara product page detected from URL pattern');
       return true;
     }

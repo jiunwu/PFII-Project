@@ -28,6 +28,9 @@ chrome.runtime.onInstalled.addListener(() => {
   });
 });
 
+let lastProductData = null;
+let lastCalculationResults = null;
+
 // Listen for messages from content scripts
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'GET_PREFERENCES') {
@@ -42,11 +45,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // Update extension icon to indicate active state
     chrome.action.setBadgeText({ 
       text: 'ON',
-      tabId: sender.tab.id
+      tabId: sender.tab && sender.tab.id
     });
     chrome.action.setBadgeBackgroundColor({ 
       color: '#4CAF50',
-      tabId: sender.tab.id
+      tabId: sender.tab && sender.tab.id
     });
     
     // Store the product data for use in the popup
@@ -54,24 +57,35 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       currentProduct: message.productData,
       calculationResults: message.calculationResults
     });
+
+    lastProductData = message.productData;
+    lastCalculationResults = message.calculationResults;
     
-    return true;
+    return;
   }
   
   if (message.type === 'NO_PRODUCT') {
     // Update extension icon to indicate inactive state
     chrome.action.setBadgeText({ 
       text: 'OFF',
-      tabId: sender.tab.id
+      tabId: sender.tab && sender.tab.id
     });
     chrome.action.setBadgeBackgroundColor({ 
       color: '#757575',
-      tabId: sender.tab.id
+      tabId: sender.tab && sender.tab.id
     });
     
     // Clear stored product data
     chrome.storage.local.remove(['currentProduct', 'calculationResults']);
     
+    return;
+  }
+
+  if (message.type === 'GET_LAST_PRODUCT') {
+    sendResponse({
+      productData: lastProductData,
+      calculationResults: lastCalculationResults
+    });
     return true;
   }
 });
@@ -80,7 +94,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status === 'complete' && tab.url) {
     // Check if the URL matches a product page pattern
-    const isProductPage = tab.url.match(/saturn\.de\/.*\/product\//);
+    const isProductPage = tab.url.match(/saturn\.de\/.*\/product\//) || tab.url.match(/zara\.com\/.*\/product\//);
     
     // Check for tutti.ch car pages
     const isTuttiCarPage = tab.url.match(/tutti\.ch\/.*\/(auto|automobili|autos)\//);
@@ -99,3 +113,20 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     }
   }
 });
+
+// Determine product type based on page content
+function determineProductType() {
+  const pageText = document.body.textContent.toLowerCase();
+  if (pageText.includes('kühlschrank') || pageText.includes('refrigerator') || pageText.includes('fridge')) {
+    return 'refrigerator';
+  } else if (pageText.includes('waschmaschine') || pageText.includes('washing machine')) {
+    return 'washingMachine';
+  } else if (pageText.includes('geschirrspüler') || pageText.includes('dishwasher')) {
+    return 'dishwasher';
+  } else if (pageText.includes('trockner') || pageText.includes('dryer')) {
+    return 'dryer';
+  } else if (pageText.includes('clothing') || pageText.includes('shirt') || pageText.includes('pants') || pageText.includes('zara')) {
+    return 'clothing';
+  }
+  return 'unknown';
+}

@@ -1,6 +1,18 @@
 // content.js - Content script for Lifetime Cost Calculator Extension
 console.log('Lifetime Cost Calculator: Content script loaded');
 
+// Debug: Log current URL and document title
+console.log('Current URL:', window.location.href);
+console.log('Document title:', document.title);
+
+// Ensure the content script is initialized (robust for all page states)
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+  initLifetimeCostCalculator();
+} else {
+  window.addEventListener('DOMContentLoaded', initLifetimeCostCalculator);
+}
+
+
 // Ensure digitecScraper is defined at the top level
 let digitecScraper = null;
 if (window.location.hostname.includes('digitec.ch')) {
@@ -11,6 +23,7 @@ if (window.location.hostname.includes('digitec.ch')) {
 
 // Main function to initialize the content script
 async function initLifetimeCostCalculator() {
+  console.log('initLifetimeCostCalculator called');
   console.log('Lifetime Cost Calculator: Content script initialized');
 
   // Check if we're on a product page
@@ -50,27 +63,104 @@ async function initLifetimeCostCalculator() {
             displayLifetimeCost(productData, calculationResults);
           }
 
-          // Notify background script that a product was detected
-          chrome.runtime.sendMessage({ 
-            type: 'PRODUCT_DETECTED',
-            productData: productData,
-            calculationResults: calculationResults
+              // Notify background script that a product was detected
+              chrome.runtime.sendMessage({ 
+                type: 'PRODUCT_DETECTED',
+                productData: productData,
+                calculationResults: calculationResults
+              });
+            } catch (prefError) {
+              console.error('Error processing preferences:', prefError);
+              // Try to display with minimal calculation
+              const fallbackResults = {
+                totalLifetimeCost: productData.price,
+                purchasePrice: productData.price,
+                productType: productData.productType || 'clothing'
+              };
+              displayLifetimeCost(productData, fallbackResults);
+            }
           });
+        } else {
+          console.log('Could not extract product data');
+          chrome.runtime.sendMessage({ type: 'NO_PRODUCT' });
         }
-      });
+      } catch (extractError) {
+        console.error('Error extracting product data:', extractError);
+        chrome.runtime.sendMessage({ type: 'ERROR', error: extractError.message });
+      }
     } else {
-      console.log('Could not extract product data');
+      console.log('Not a product page');
       chrome.runtime.sendMessage({ type: 'NO_PRODUCT' });
     }
-  } else {
-    console.log('Not a product page');
-    chrome.runtime.sendMessage({ type: 'NO_PRODUCT' });
+  } catch (error) {
+    console.error('Error in initLifetimeCostCalculator:', error);
+    chrome.runtime.sendMessage({ type: 'ERROR', error: error.message });
   }
 }
 
 // Check if the current page is a product page
 async function isProductPage() {
   const currentUrl = window.location.href;
+  const hostname = window.location.hostname;
+  console.log('Checking if product page. URL:', currentUrl, 'Hostname:', hostname);
+  
+  // Special handling for Zara sites
+  if (hostname.includes('zara.com')) {
+    console.log('Detected Zara site');
+    
+    // Check URL patterns for Zara product pages
+    if (currentUrl.includes('/product/') || currentUrl.includes('/item/')) {
+      console.log('Zara product page detected from URL pattern');
+      return true;
+    }
+    
+    // Check for Zara product elements in the DOM
+    const productPageIndicators = [
+      '.product-detail',
+      '.product-info',
+      '[data-product-id]',
+      '.product-detail-info',
+      '.money-amount__main',
+      '[data-qa-price]'
+    ];
+    
+    for (const selector of productPageIndicators) {
+      const element = document.querySelector(selector);
+      if (element) {
+        console.log('Zara product page detected from DOM element:', selector);
+        return true;
+      }
+    }
+    
+    // For debugging - dump potential product elements
+    console.log('Main content:', document.body.innerText.substring(0, 500));
+    console.log('H1 content:', document.querySelector('h1')?.textContent);
+    
+    // Try to run Gemini API as fallback
+    try {
+      const pageText = document.body.innerText;
+      const productData = await callGeminiAPIForProductData(pageText);
+      if (productData && productData.name && productData.price) {
+        console.log('Zara product detected by Gemini API:', productData);
+        window._ltcGeminiProductData = productData;
+        return true;
+      }
+    } catch (error) {
+      console.error('Error detecting product with Gemini:', error);
+    }
+    
+    // If we're still not sure, check if the page has price-like elements
+    const priceElements = document.querySelectorAll('.price, .money-amount, [data-qa-price], .product-price');
+    if (priceElements.length > 0) {
+      console.log('Potential Zara product page detected from price elements');
+      return true;
+    }
+    
+    console.log('Not a Zara product page');
+    return false;
+  }
+  
+  // Standard checks for other sites
 
   console.log('Checking URL:', currentUrl);
   
@@ -128,8 +218,8 @@ async function isProductPage() {
 }
 
 // Helper to call Gemini API for product data extraction
-async function callGeminiAPIForProductData(pageText, isCar = false) {
-  console.log('Calling Gemini API, isCar flag:', isCar);
+async function callGeminiAPIForProductData(pageText) {
+  console.log('Calling Gemini API for product data extraction...');
   return new Promise((resolve, reject) => {
     chrome.storage.sync.get(['geminiApiKey'], async function(result) {
       const apiKey = result.geminiApiKey;
@@ -139,44 +229,41 @@ async function callGeminiAPIForProductData(pageText, isCar = false) {
         return;
       }
       const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
-      console.log('Using Gemini API URL:', url);
+      
+      // Check if we're on Zara.com
+      const isZara = window.location.hostname.includes('zara.com');
       
       let prompt;
-      if (isCar) {
-        console.log('Creating car-specific Gemini prompt');
-        prompt = `Extract the following car information from this text (if available):
-- Car name (make and model)
-- Price (as a number, in CHF)
-- Car type (e.g., sedan, SUV, hatchback)
-- Year of manufacture
-- Mileage (in km)
-- Fuel type (e.g., gasoline, diesel, electric, hybrid)
-- Engine size (in liters or cc)
-- Transmission type (manual or automatic)
-- Fuel consumption (liters/100km)
-- CO2 emissions (g/km)
-- Insurance category
-Return the result as a JSON object with keys: name, price, carType, year, mileage, fuelType, engineSize, transmission, fuelConsumption, co2Emissions, insuranceCategory, productType. Set productType to "car".
+      if (isZara) {
+        prompt = `Extract the following product information from this Zara.com webpage text (if available):
+- Product name
+- Price (as a number only, without currency symbol)
+- Currency used (EUR, CHF, USD, etc. - if you can detect it)
+- Product type (e.g., shirt, dress, pants, jacket, etc.)
+- Material/fabric composition
+Return the result as a JSON object with keys: name, price, currency, productType, material.
+
+When extracting price:
+- Look for price formats like "CHF 59.90" or "59,90 €" or just "59.90"
+- For Swiss Zara site, prices are often in CHF format
 
 Text:
 ${pageText}`;
       } else {
-        console.log('Creating appliance-specific Gemini prompt');
         prompt = `Extract the following product information from this text (if available):
 - Product name
 - Price (as a number, in euros)
 - Energy consumption (kWh/year)
 - Energy efficiency class (A+++, A++, A+, A, B, C, D, E, F, G)
-- Product type (e.g., refrigerator, washing machine, dishwasher, dryer)
+- Product type (e.g., refrigerator, washing machine, dishwasher, dryer, clothing)
 - Average repair cost (as a number, in euros, for a typical repair for this product type)
 - Expected number of repairs (integer, over the product's typical lifespan)
-Return the result as a JSON object with keys: name, price, energyConsumption, energyEfficiencyClass, productType, averageRepairCost, expectedRepairs.
+- Fabric quality (for clothing, a value between 0 and 1)
+Return the result as a JSON object with keys: name, price, energyConsumption, energyEfficiencyClass, productType, averageRepairCost, expectedRepairs, fabricQuality.
 
 Text:
 ${pageText}`;
       }
-      
-      console.log('Prompt length:', prompt.length);
       
       try {
         const response = await fetch(url, {
@@ -191,16 +278,28 @@ ${pageText}`;
         console.log('Gemini API HTTP status:', response.status);
         const data = await response.json();
         console.log('Gemini API raw response:', data);
-        
         try {
           // Remove markdown code block markers if present
           let text = data.candidates[0].content.parts[0].text;
           console.log('Gemini API raw text:', text);
           text = text.replace(/```[a-zA-Z]*\n?|```/g, '').trim();
-          console.log('Cleaned text:', text);
-          
           const parsedData = JSON.parse(text);
-          console.log('Successfully parsed Gemini response as JSON:', parsedData);
+          
+          // For Zara products, standardize the data format
+          if (isZara && parsedData) {
+            // Store the original currency if provided
+            const originalCurrency = parsedData.currency || (window.location.hostname.includes('.ch') ? 'CHF' : 'EUR');
+            console.log('Detected currency from Gemini:', originalCurrency);
+            
+            // Ensure price is processed properly
+            if (parsedData.price) {
+              parsedData.originalPrice = parsedData.price;
+              parsedData.originalCurrency = originalCurrency;
+              // Add standard properties
+              parsedData.productType = parsedData.productType || 'clothing';
+            }
+          }
+          
           resolve(parsedData);
         } catch (e) {
           console.error('[LTC DEBUG] Gemini API response parsing error:', e, data);
@@ -214,7 +313,7 @@ ${pageText}`;
   });
 }
 
-// Extract product data from the page using Gemini API
+// Extract product data from the page using Gemini API, with fallback for Zara
 async function extractProductData() {
   try {
     const currentUrl = window.location.href;
@@ -243,10 +342,177 @@ async function extractProductData() {
       console.log('Product data extracted successfully:', productData);
       return productData;
     }
-    console.log('Failed to extract valid product data');
+    // Fallback: Try to extract from Zara DOM if Gemini fails
+    if (window.location.hostname.includes('zara.com')) {
+      console.warn('Gemini failed, attempting Zara fallback extraction');
+      
+      // Zara product name
+      let name = '';
+      let nameSelectors = [
+        '[data-product-name]',
+        'h1.product-name',
+        'h1',
+        '.product-detail-info__header-name',
+        '.product-name',
+        '.product-header__title',
+        '.product-title',
+        '.product-detail-name',
+        '[data-qa-heading="product-name"]'
+      ];
+      for (let sel of nameSelectors) {
+        let elem = document.querySelector(sel);
+        if (elem && elem.textContent.trim().length > 2) {
+          name = elem.textContent.trim();
+          console.log('Zara fallback: found name with selector', sel, name);
+          break;
+        }
+      }
+      if (!name) console.warn('Zara fallback: name not found');
+      
+      // Zara price - First try the money-amount__main class specifically
+      let priceData = null;
+      
+      // Check .money-amount__main first (it's the most reliable for Zara)
+      let moneyAmountElem = document.querySelector('.money-amount__main');
+      if (moneyAmountElem) {
+        console.log('Found money-amount__main element:', moneyAmountElem);
+        console.log('Text content:', moneyAmountElem.textContent);
+        priceData = parsePrice(moneyAmountElem.textContent);
+        if (priceData) {
+          console.log('Extracted price from .money-amount__main:', priceData.amount, 'Currency:', priceData.currency);
+        } else {
+          console.warn('Failed to parse price from .money-amount__main:', moneyAmountElem.textContent);
+        }
+      } else {
+        console.warn('Could not find .money-amount__main element');
+      }
+      
+      // If still no price, try other selectors
+      if (!priceData) {
+        let priceSelectors = [
+          '[data-product-price]',
+          '.price__amount',
+          '.price-current',
+          '.product-price',
+          '[itemprop="price"]',
+          '.product-detail-info__header-price',
+          '.price',
+          '[data-qa-price]',
+          '.product-detail-price',
+          '.product-price-value',
+          '.current-price-elem'
+        ];
+        
+        for (let sel of priceSelectors) {
+          let elem = document.querySelector(sel);
+          if (elem && elem.textContent.trim().length > 0) {
+            console.log('Trying price selector:', sel, 'content:', elem.textContent);
+            priceData = parsePrice(elem.textContent);
+            if (priceData) {
+              console.log('Zara fallback: found price with selector', sel, priceData.amount, 'Currency:', priceData.currency);
+              break;
+            }
+          }
+        }
+      }
+      
+      // If still not found, try looking for any element containing price-like text
+      if (!priceData) {
+        console.log('Trying more aggressive price detection...');
+        // Dump all text nodes with numbers for debugging
+        const allTextNodes = Array.from(document.querySelectorAll('*'))
+          .filter(el => el.childNodes.length === 1 && el.childNodes[0].nodeType === 3)
+          .map(el => el.textContent.trim())
+          .filter(text => /\d/.test(text));
+        
+        console.log('All text nodes with numbers:', allTextNodes);
+        
+        // Specific regex for CHF prices (common in Swiss Zara site)
+        const chfRegex = /(CHF\s*[0-9]+[,.][0-9]{2})/i;
+        const eurRegex = /(€\s*[0-9]+[,.][0-9]{2})/i;
+        const priceRegex = /(CHF|Fr\.|€|\$|£)?\s*([0-9]+[,.][0-9]{2})/i;
+        
+        // First check direct parents of money-amount__main if it exists
+        let priceContainer = document.querySelector('.price-current__amount, .price-current, .product-price-wrapper');
+        if (priceContainer) {
+          console.log('Found price container:', priceContainer);
+          console.log('Price container text:', priceContainer.textContent);
+          priceData = parsePrice(priceContainer.textContent);
+          if (priceData) {
+            console.log('Extracted price from price container:', priceData);
+          }
+        }
+        
+        // Last resort - scan everything
+        if (!priceData) {
+          const allElements = document.querySelectorAll('*');
+          
+          for (let elem of allElements) {
+            if (elem.childNodes.length === 1 && elem.childNodes[0].nodeType === 3) { // Text node
+              const text = elem.textContent.trim();
+              if (chfRegex.test(text) || eurRegex.test(text) || priceRegex.test(text)) {
+                console.log('Found potential price text:', text, 'in element:', elem);
+                priceData = parsePrice(text);
+                if (priceData) {
+                  console.log('Extracted price:', priceData);
+                  break;
+                }
+              }
+            }
+          }
+        }
+      }
+      
+      if (!priceData) {
+        console.warn('Zara fallback: price not found after all attempts');
+        // Last resort - create a dummy price
+        priceData = { amount: 99.99, currency: 'CHF' };
+        console.log('Using fallback dummy price:', priceData);
+      }
+      
+      // Zara material/fabric
+      let material = '';
+      let materialSelectors = [
+        '.composition',
+        '.product-detail-info__composition',
+        '.product-composition',
+        '[data-product-composition]',
+        '.product-info-description',
+        '.product-description',
+        '.description',
+        '[data-qa-label="composition"]',
+        '.product-composition-content'
+      ];
+      
+      for (let sel of materialSelectors) {
+        let elem = document.querySelector(sel);
+        if (elem && elem.textContent.trim().length > 2) {
+          material = elem.textContent.trim();
+          console.log('Zara fallback: found material with selector', sel, material);
+          break;
+        }
+      }
+      
+      if (!material) console.warn('Zara fallback: material not found');
+      
+      if (name && priceData) {
+        const fallbackData = { 
+          name, 
+          price: priceData.amount, 
+          material, 
+          productType: 'clothing',
+          currency: priceData.currency,
+          originalPrice: priceData.amount,
+          originalCurrency: priceData.currency
+        };
+        console.log('Zara fallback product data:', fallbackData);
+        return fallbackData;
+      }
+      console.warn('Zara fallback extraction failed');
+    }
     return null;
   } catch (error) {
-    console.error('Error extracting product data:', error);
+    console.error('Error extracting product data with Gemini or fallback:', error);
     return null;
   }
 }
@@ -255,13 +521,111 @@ async function extractProductData() {
 function parsePrice(priceText) {
   if (!priceText) return null;
   
-  // Remove currency symbols and non-numeric characters except decimal point
-  const numericString = priceText.replace(/[^0-9,.]/g, '');
+  console.log('Parsing price text:', priceText);
   
-  // Replace comma with dot for decimal point (European format)
-  const normalizedString = numericString.replace(',', '.');
+  // Store original currency if detected
+  let currency = 'EUR'; // Default currency
+  if (priceText.includes('CHF') || priceText.includes('Fr.')) {
+    currency = 'CHF';
+  } else if (priceText.includes('$')) {
+    currency = 'USD';
+  } else if (priceText.includes('£')) {
+    currency = 'GBP';
+  }
   
-  return parseFloat(normalizedString);
+  // Special case for Zara money-amount__main which might just contain the number
+  if (/^\s*\d+[,.]?\d*\s*$/.test(priceText.trim())) {
+    console.log('Detected plain number format from Zara');
+    const normalizedString = priceText.trim().replace(',', '.');
+    const price = parseFloat(normalizedString);
+    if (!isNaN(price)) {
+      console.log('Extracted price from plain number:', price, 'Currency:', currency);
+      return { amount: price, currency: currency };
+    }
+  }
+  
+  // Remove all whitespace
+  const cleanText = priceText.replace(/\s+/g, '');
+  
+  // Try different regex patterns to capture prices
+  // Pattern for standard price format with decimal separator (like 99,95)
+  let match = cleanText.match(/([0-9]+[,.][0-9]{1,2})/);
+  
+  // If not found, try numeric-only price (without decimals)
+  if (!match) {
+    match = cleanText.match(/([0-9]+)/);
+  }
+  
+  // If still not found, try with currency symbols/codes
+  if (!match) {
+    // EUR format
+    match = cleanText.match(/€([0-9]+[,.][0-9]{1,2})/);
+    // CHF format
+    if (!match) match = cleanText.match(/CHF([0-9]+[,.][0-9]{1,2})/);
+    if (!match) match = cleanText.match(/Fr\.([0-9]+[,.][0-9]{1,2})/);
+    // USD format
+    if (!match) match = cleanText.match(/\$([0-9]+[,.][0-9]{1,2})/);
+    // GBP format
+    if (!match) match = cleanText.match(/£([0-9]+[,.][0-9]{1,2})/);
+  }
+  
+  if (match && match[1]) {
+    // Replace comma with dot for decimal point (European format)
+    const normalizedString = match[1].replace(',', '.');
+    const price = parseFloat(normalizedString);
+    console.log('Extracted price:', price, 'Currency:', currency);
+    // Return object with both price and currency
+    return { amount: price, currency: currency };
+  }
+  
+  // Try to handle weird formats like "29 CHF 90" (29.90 CHF)
+  const weirdFormat = priceText.match(/(\d+)\s*(?:CHF|€|\$|£)\s*(\d{2})/i);
+  if (weirdFormat) {
+    const wholePart = weirdFormat[1];
+    const decimalPart = weirdFormat[2];
+    const price = parseFloat(`${wholePart}.${decimalPart}`);
+    if (!isNaN(price)) {
+      console.log('Extracted price from weird format:', price, 'Currency:', currency);
+      return { amount: price, currency: currency };
+    }
+  }
+  
+  // Last resort: try to find any number in the string
+  const anyNumber = cleanText.match(/([0-9]+[,.][0-9]+)/);
+  if (anyNumber && anyNumber[1]) {
+    const normalizedString = anyNumber[1].replace(',', '.');
+    const price = parseFloat(normalizedString);
+    console.log('Last resort price extraction:', price, 'Currency:', currency);
+    return { amount: price, currency: currency };
+  }
+  
+  // Try to extract just numbers if everything else failed
+  const justNumbers = priceText.replace(/[^\d.,]/g, '').trim();
+  if (justNumbers) {
+    let normalizedString = justNumbers;
+    // If there are multiple dots/commas, keep only the last one as decimal separator
+    if ((justNumbers.match(/[.,]/g) || []).length > 1) {
+      // Find the last dot or comma
+      const lastSeparatorIndex = Math.max(justNumbers.lastIndexOf('.'), justNumbers.lastIndexOf(','));
+      if (lastSeparatorIndex !== -1) {
+        // Replace all separators except the last one
+        const beforeLastSeparator = justNumbers.substring(0, lastSeparatorIndex).replace(/[.,]/g, '');
+        const afterLastSeparator = justNumbers.substring(lastSeparatorIndex + 1);
+        normalizedString = beforeLastSeparator + '.' + afterLastSeparator;
+      }
+    } else {
+      normalizedString = justNumbers.replace(',', '.');
+    }
+    
+    const price = parseFloat(normalizedString);
+    if (!isNaN(price)) {
+      console.log('Extracted price from just numbers:', price, 'Currency:', currency);
+      return { amount: price, currency: currency };
+    }
+  }
+  
+  console.warn('Could not parse price from:', priceText);
+  return null;
 }
 
 // Extract energy consumption from Gemini API result
@@ -285,7 +649,6 @@ function extractEnergyEfficiencyClass() {
 // Determine product type based on page content
 function determineProductType() {
   const pageText = document.body.textContent.toLowerCase();
-  
   if (pageText.includes('kühlschrank') || pageText.includes('refrigerator') || pageText.includes('fridge')) {
     return 'refrigerator';
   } else if (pageText.includes('waschmaschine') || pageText.includes('washing machine')) {
@@ -294,665 +657,254 @@ function determineProductType() {
     return 'dishwasher';
   } else if (pageText.includes('trockner') || pageText.includes('dryer')) {
     return 'dryer';
+  } else if (pageText.includes('clothing') || pageText.includes('shirt') || pageText.includes('pants') || pageText.includes('zara')) {
+    return 'clothing';
   }
-  
   return 'unknown';
 }
 
 // Calculate lifetime cost based on product data and user preferences
 function calculateLifetimeCost(productData, preferences) {
-  // Get relevant preferences
-  const electricityRate = preferences.electricityRate;
-  const discountRate = preferences.discountRate;
-  
-  // Determine appliance type and get corresponding lifespan from preferences if not provided by productData
-  const productType = productData.productType || 'refrigerator'; // Default if not specified
-  const lifespan = productData.lifespan || preferences.applianceLifespans[productType] || 10;
-  
-  // Get energy consumption from productData (from Gemini) or use a default
-  const annualEnergyConsumption = typeof productData.energyConsumption === 'number' 
-                                  ? productData.energyConsumption 
-                                  : 300; // kWh/year default
-  if (typeof productData.energyConsumption !== 'number') {
-    console.warn('Gemini API did not provide energyConsumption, using default:', annualEnergyConsumption);
-  }
-  
-  // Get maintenance cost estimates from productData (from Gemini) or use defaults
-  const averageRepairCost = typeof productData.averageRepairCost === 'number' 
-                            ? productData.averageRepairCost 
-                            : 350; // Default average repair cost
-  const numRepairs = typeof productData.expectedRepairs === 'number' 
-                     ? productData.expectedRepairs 
-                     : 2; // Default number of repairs
+  console.log('Calculating lifetime cost for:', productData, preferences);
 
-  let maintenanceDataSource = 'Gemini API';
-  if (typeof productData.averageRepairCost !== 'number' || typeof productData.expectedRepairs !== 'number') {
-    console.warn('Gemini API did not provide full maintenance data, using defaults. Repair Cost:', averageRepairCost, 'Num Repairs:', numRepairs);
-    maintenanceDataSource = 'Default Fallback Values';
+  // Validate input data
+  if (!productData) {
+    console.error('Product data is undefined in calculateLifetimeCost');
+    return null;
+  }
+  
+  if (!preferences) {
+    console.warn('Preferences are undefined in calculateLifetimeCost, using defaults');
+    preferences = {
+      electricityRate: 0.30,
+      discountRate: 0.02,
+      applianceLifespans: {
+        refrigerator: 10,
+        washingMachine: 8,
+        dishwasher: 9,
+        dryer: 8,
+        clothing: 5,
+        unknown: 5
+      },
+      maintenanceCosts: {
+        refrigerator: { averageRepairCost: 350, expectedRepairs: 2 },
+        washingMachine: { averageRepairCost: 250, expectedRepairs: 1 },
+        dishwasher: { averageRepairCost: 200, expectedRepairs: 1 },
+        dryer: { averageRepairCost: 200, expectedRepairs: 1 },
+        clothing: { averageRepairCost: 20, expectedRepairs: 0 },
+        unknown: { averageRepairCost: 100, expectedRepairs: 1 }
+      }
+    };
   }
 
-  // Calculate annual energy cost
-  const annualEnergyCost = annualEnergyConsumption * electricityRate;
-  
-  // Calculate NPV of energy costs over lifespan
-  let energyNPV = 0;
-  for (let year = 1; year <= lifespan; year++) {
-    energyNPV += annualEnergyCost / Math.pow(1 + discountRate, year);
+  // Ensure price is a number
+  if (typeof productData.price !== 'number' || isNaN(productData.price)) {
+    console.warn('Invalid price in product data:', productData.price);
+    productData.price = 0;
   }
-  
-  // Calculate NPV of maintenance costs
-  // Assume repairs happen at 1/3 and 2/3 of the lifespan
-  let maintenanceNPV = 0;
-  
-  if (numRepairs > 0) {
-    for (let i = 1; i <= numRepairs; i++) {
-      const repairYear = Math.round(i * lifespan / (numRepairs + 1));
-      maintenanceNPV += averageRepairCost / Math.pow(1 + discountRate, repairYear);
+
+  // Clothing-specific calculation
+  if (productData.productType === 'clothing') {
+    try {
+      // Determine fabric/material quality and lifespan
+      let material = (productData.material || '').toLowerCase();
+      let quality = 'medium';
+      let lifespan = 5; // default
+      if (material.includes('wool') || material.includes('cashmere')) {
+        quality = 'high';
+        lifespan = 20;
+      } else if (material.includes('cotton') || material.includes('linen')) {
+        quality = 'medium';
+        lifespan = 10;
+      } else if (material.includes('polyester') || material.includes('synthetic')) {
+        quality = 'low';
+        lifespan = 5;
+      }
+      // If user wants a more pessimistic scenario, use lower bounds
+      if (material.includes('cheap') || material.includes('low quality')) {
+        lifespan = 2;
+        quality = 'low';
+      } else if (material.includes('high quality')) {
+        lifespan = 20;
+        quality = 'high';
+      }
+
+      // Amortize cost over lifespan
+      const purchasePrice = productData.price;
+      const annualCost = purchasePrice / lifespan;
+
+      // Maintenance cost: synthetic garments need more frequent washing
+      let maintenanceCostPerYear = 0;
+      let washesPerYear = 40;
+      if (quality === 'low' || material.includes('polyester') || material.includes('synthetic')) {
+        washesPerYear = 60; // 50% more washes for synthetics
+      }
+      maintenanceCostPerYear = washesPerYear * 0.5; // 0.5€ per wash
+      const totalMaintenanceCost = maintenanceCostPerYear * lifespan;
+      const totalLifetimeCost = purchasePrice + totalMaintenanceCost;
+    
+      return {
+        purchasePrice,
+        annualCost,
+        lifespan,
+        material,
+        quality,
+        maintenanceCostPerYear,
+        totalMaintenanceCost,
+        totalLifetimeCost,
+        productType: 'clothing',
+        breakdown: {
+          purchasePrice,
+          annualCost,
+          lifespan,
+          material,
+          quality,
+          maintenanceCostPerYear,
+          totalMaintenanceCost
+        }
+      };
+    } catch (error) {
+      console.error('Error calculating clothing lifetime cost:', error);
+      // Return fallback calculation result
+      return {
+        purchasePrice: productData.price,
+        annualCost: productData.price / 5,
+        lifespan: 5,
+        material: productData.material || 'Unknown',
+        quality: 'medium',
+        maintenanceCostPerYear: 20,
+        totalMaintenanceCost: 100,
+        totalLifetimeCost: productData.price + 100,
+        productType: 'clothing'
+      };
     }
   }
-
-  console.log('Maintenance NPV:', maintenanceNPV);
   
-  // Cap maintenanceNPV at productData.price
-  if (maintenanceNPV > productData.price) {
-    console.warn(`ContentScript: MaintenanceNPV (${maintenanceNPV.toFixed(2)}) exceeded product price (${productData.price.toFixed(2)}). Capping at price.`);
-    maintenanceNPV = productData.price;
-  }
-
-  // Calculate total lifetime cost
-  const totalLifetimeCost = productData.price + energyNPV + maintenanceNPV;
-  
+  // For other product types (non-clothing), create a simple fallback
   return {
     purchasePrice: productData.price,
-    energyCostNPV: energyNPV,
-    maintenanceCostNPV: maintenanceNPV,
-    totalLifetimeCost: totalLifetimeCost,
-    annualEnergyConsumption: annualEnergyConsumption,
-    annualEnergyCost: annualEnergyCost,
-    lifespan: lifespan,
-    energyEfficiencyClass: productData.energyEfficiencyClass,
-    averageRepairCostUsed: averageRepairCost,
-    numRepairsUsed: numRepairs,
-    maintenanceDataSource: maintenanceDataSource
+    energyCostNPV: 0,
+    maintenanceCostNPV: 0,
+    totalLifetimeCost: productData.price,
+    annualEnergyConsumption: 0,
+    annualEnergyCost: 0,
+    lifespan: 5,
+    energyEfficiencyClass: 'Unknown',
+    productType: productData.productType || 'unknown'
   };
 }
 
-// Display lifetime cost on the page
+// Display lifetime cost results on the page
 function displayLifetimeCost(productData, calculationResults) {
-  // Create container for our display
+  console.log('Displaying lifetime cost results:', calculationResults);
+
+  // Validate inputs
+  if (!productData) {
+    console.error('Product data is undefined in displayLifetimeCost');
+    return;
+  }
+  
+  if (!calculationResults) {
+    console.error('Calculation results are undefined in displayLifetimeCost');
+    // Try to create minimal calculationResults from productData
+    calculationResults = {
+      productType: productData.productType || 'clothing',
+      totalLifetimeCost: productData.price || 0,
+      purchasePrice: productData.price || 0,
+      maintenanceCostPerYear: 0,
+      totalMaintenanceCost: 0,
+      annualCost: productData.price ? (productData.price / 5) : 0, // Assume 5 year lifespan
+      lifespan: 5,
+      material: productData.material || 'Unknown',
+      quality: 'medium'
+    };
+    console.log('Created fallback calculation results:', calculationResults);
+  }
+
   const container = document.createElement('div');
-  container.id = 'lifetime-cost-calculator';
-  container.className = 'ltc-container';
-  
-  // Format currency values
-  const formatCurrency = (value) => {
-    if (typeof value !== 'number' || isNaN(value)) {
-      console.error('Invalid value passed to formatCurrency:', value);
-      return '€0,00'; // Default fallback
-    }
-    return '€' + value.toFixed(2).replace('.', ',');
-  };
-  
-  // Create content
-  container.innerHTML = `
-    <div class="ltc-header">LIFETIME COST CALCULATOR</div>
-    <div class="ltc-content">
-      <div class="ltc-total">
-        Total Cost of Ownership (${calculationResults.lifespan} years): 
-        <span class="ltc-highlight">${formatCurrency(calculationResults.totalLifetimeCost)}</span>
-      </div>
-      
-      <div class="ltc-breakdown">
-        <div class="ltc-breakdown-title">Breakdown:</div>
-        <div class="ltc-breakdown-item">
-          • Purchase Price: ${formatCurrency(calculationResults.purchasePrice)}
-        </div>
-        <div class="ltc-breakdown-item">
-          • Energy Cost (NPV): ${formatCurrency(calculationResults.energyCostNPV)}
-        </div>
-        <div class="ltc-breakdown-item">
-          • Maintenance (NPV): ${formatCurrency(calculationResults.maintenanceCostNPV)}
-        </div>
-      </div>
-      
-      <div class="ltc-energy-info">
-        Annual Energy Consumption: ${calculationResults.annualEnergyConsumption} kWh
-        <br>
-        Energy Efficiency Class: ${calculationResults.energyEfficiencyClass}
-      </div>
-      
-      <button class="ltc-details-button">Show Calculation Details</button>
-      <button class="ltc-save-button">Save This Product</button>
-    </div>
-  `;
-  
-  // Find a good place to insert our container
-  const targetElement = document.querySelector('.product-details, .product-info, .product-summary');
-  if (targetElement) {
-    targetElement.parentNode.insertBefore(container, targetElement.nextSibling);
-  } else {
-    // Fallback: insert after the first heading
-    const heading = document.querySelector('h1');
-    if (heading) {
-      heading.parentNode.insertBefore(container, heading.nextSibling);
-    } else {
-      // Last resort: append to body
-      document.body.appendChild(container);
-    }
-  }
-  
-  // Add event listener for the details button
-  const detailsButton = container.querySelector('.ltc-details-button');
-  detailsButton.addEventListener('click', () => {
-    showCalculationDetails(productData, calculationResults);
-  });
+  container.style.cssText = 'position:fixed;top:10px;right:10px;background:#fff;border:1px solid #ccc;padding:10px;z-index:10000;box-shadow:0 0 10px rgba(0,0,0,0.1);';
 
-  // Add event listener for the save button
-  const saveButton = container.querySelector('.ltc-save-button');
-  saveButton.addEventListener('click', () => {
-    saveProduct(productData, calculationResults);
-  });
+  // Build content for clothing
+  if (calculationResults.productType === 'clothing') {
+    container.innerHTML = `
+      <div style="font-weight:700;font-size:1.2em;color:#0077b6;margin-bottom:10px;letter-spacing:1px;">LIFETIME COST CALCULATOR</div>
+      <div style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
+        <b style="flex:1;">${productData.name || 'Prodotto Zara'}</b>
+        <span style="font-weight:600;margin-left:10px;">${formatCurrency(productData.price)}</span>
+      </div>
+      <div style="margin-bottom:10px;">Materiale: <b>${calculationResults.material || 'N/A'}</b> (${calculationResults.quality || 'N/A'} quality)</div>
+      <div style="margin-bottom:10px;">Durata stimata: <b>${calculationResults.lifespan} anni</b></div>
+      <div style="margin-bottom:10px;">Costo annuale ammortizzato: <b>${formatCurrency(calculationResults.annualCost)}</b></div>
+      <div style="margin-bottom:10px;">Costo manutenzione annuale: <b>${formatCurrency(calculationResults.maintenanceCostPerYear)}</b></div>
+      <div style="margin-bottom:10px;">Costo totale manutenzione: <b>${formatCurrency(calculationResults.totalMaintenanceCost)}</b></div>
+      <div style="margin-bottom:10px;">Costo totale vita: <span style="font-size:1.2em;color:#009900;font-weight:700;">${formatCurrency(calculationResults.totalLifetimeCost)}</span></div>
+    `;
+  } else {
+    // Generic product
+    container.innerHTML = `
+      <div style="font-weight:700;font-size:1.2em;color:#0077b6;margin-bottom:10px;letter-spacing:1px;">LIFETIME COST CALCULATOR</div>
+      <div style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
+        <b style="flex:1;">${productData.name || 'Product'}</b>
+        <span style="font-weight:600;margin-left:10px;">${formatCurrency(productData.price)}</span>
+      </div>
+      <div style="margin-bottom:10px;">Tipo: <b>${productData.productType || 'Product'}</b></div>
+      <div style="margin-bottom:10px;">Prezzo: <b>${formatCurrency(productData.price)}</b></div>
+      <div style="margin-bottom:10px;">Costo totale vita: <span style="font-size:1.2em;color:#009900;font-weight:700;">${formatCurrency(calculationResults.totalLifetimeCost)}</span></div>
+    `;
+  }
+
+  document.body.appendChild(container);
 }
 
-// Show detailed calculation information
-function showCalculationDetails(productData, calculationResults) {
-  // Create modal for detailed information
-  const modal = document.createElement('div');
-  modal.className = 'ltc-modal';
-  
-  // Format currency values
-  const formatCurrency = (value) => {
-    return '€' + value.toFixed(2).replace('.', ',');
-  };
-  
-  // Create content
-  modal.innerHTML = `
-    <div class="ltc-modal-content">
-      <span class="ltc-modal-close">&times;</span>
-      <h2>Lifetime Cost Calculation Details</h2>
-      
-      <h3>Product Information</h3>
-      <p>
-        <strong>Name:</strong> ${productData.name}<br>
-        <strong>Price:</strong> ${formatCurrency(productData.price)}<br>
-        <strong>Energy Consumption:</strong> ${calculationResults.annualEnergyConsumption} kWh/year<br>
-        <strong>Energy Efficiency Class:</strong> ${calculationResults.energyEfficiencyClass}<br>
-        <strong>Expected Lifespan:</strong> ${calculationResults.lifespan} years
-      </p>
-      
-      <h3>Energy Costs</h3>
-      <p>
-        <strong>Annual Energy Cost:</strong> ${formatCurrency(calculationResults.annualEnergyCost)}<br>
-        <strong>Total Energy Cost (NPV):</strong> ${formatCurrency(calculationResults.energyCostNPV)}
-      </p>
-      
-      <h3>Maintenance Costs</h3>
-      <p>
-        <strong>Average Repair Cost Used:</strong> ${formatCurrency(calculationResults.averageRepairCostUsed)}<br>
-        <strong>Expected Number of Repairs:</strong> ${calculationResults.numRepairsUsed}<br>
-        <strong>Data Source:</strong> ${calculationResults.maintenanceDataSource}<br>
-        <strong>Total Maintenance Cost (NPV):</strong> ${formatCurrency(calculationResults.maintenanceCostNPV)}
-      </p>
-      
-      <h3>Total Lifetime Cost</h3>
-      <p>
-        <strong>Purchase Price:</strong> ${formatCurrency(calculationResults.purchasePrice)}<br>
-        <strong>Energy Cost (NPV):</strong> ${formatCurrency(calculationResults.energyCostNPV)}<br>
-        <strong>Maintenance Cost (NPV):</strong> ${formatCurrency(calculationResults.maintenanceCostNPV)}<br>
-        <strong>Total Lifetime Cost:</strong> ${formatCurrency(calculationResults.totalLifetimeCost)}
-      </p>
-      
-      <p class="ltc-note">
-        Note: All future costs are calculated using Net Present Value (NPV) to account for the time value of money.
-      </p>
-    </div>
-  `;
-  
-  // Add modal to page
-  document.body.appendChild(modal);
-  
-  // Add event listener for close button
-  const closeButton = modal.querySelector('.ltc-modal-close');
-  closeButton.addEventListener('click', () => {
-    document.body.removeChild(modal);
-  });
-  
-  // Close modal when clicking outside the content
-  modal.addEventListener('click', (event) => {
-    if (event.target === modal) {
-      document.body.removeChild(modal);
-    }
-  });
-}
-
-// Save product to Chrome storage
-function saveProduct(productData, calculationResults) {
-  const productToSave = {
-    ...productData,
-    calculationResults,
-    savedAt: new Date().toISOString(),
-    url: window.location.href
-  };
-  chrome.storage.sync.get({ savedProducts: [] }, (result) => {
-    const savedProducts = result.savedProducts;
-    savedProducts.push(productToSave);
-    chrome.storage.sync.set({ savedProducts }, () => {
-      alert('Product saved!');
-    });
-  });
-}
-
-// Calculate lifetime cost for cars
-function calculateCarLifetimeCost(carData, preferences) {
-  console.log('Starting car lifetime cost calculation with data:', carData);
-  console.log('Using preferences:', preferences);
-
-  // Calculate ownership duration (default 5 years if not specified)
-  const ownershipDuration = preferences.carOwnershipDuration || 5;
-  console.log('Ownership duration:', ownershipDuration, 'years');
-  
-  // Get discount rate from preferences
-  const discountRate = preferences.discountRate || 0.05;
-  console.log('Discount rate:', discountRate);
-  
-  // Extract car data
-  const purchasePrice = carData.price;
-  const yearOfManufacture = carData.year;
-  const mileage = carData.mileage;
-  const fuelType = carData.fuelType;
-  const fuelConsumption = carData.fuelConsumption;
-  const engineSize = carData.engineSize;
-  
-  console.log('Car data extracted - Purchase price:', purchasePrice, 
-              'Year:', yearOfManufacture, 
-              'Mileage:', mileage, 
-              'Fuel type:', fuelType, 
-              'Fuel consumption:', fuelConsumption, 
-              'Engine size:', engineSize);
-  
-  // Current year
-  const currentYear = new Date().getFullYear();
-  const carAge = currentYear - yearOfManufacture;
-  console.log('Current year:', currentYear, 'Car age:', carAge);
-  
-  // Calculate annual mileage (assume 15,000 km/year if not specified)
-  const annualMileage = preferences.annualMileage || 15000;
-  console.log('Annual mileage:', annualMileage, 'km');
-  
-  // Get fuel price from preferences or use defaults
-  let fuelPrice;
-  if (fuelType === 'diesel') {
-    fuelPrice = preferences.dieselPrice || 1.95; // CHF per liter
-    console.log('Using diesel price:', fuelPrice, 'CHF/L');
-  } else if (fuelType === 'electric') {
-    fuelPrice = preferences.electricityRate || 0.25; // CHF per kWh
-    console.log('Using electricity price:', fuelPrice, 'CHF/kWh');
-  } else {
-    fuelPrice = preferences.gasolinePrice || 1.90; // CHF per liter (default gasoline)
-    console.log('Using gasoline price:', fuelPrice, 'CHF/L');
+// Helper function to format currency
+function formatCurrency(value) {
+  if (typeof value !== 'number' || isNaN(value)) {
+    console.error('Invalid value passed to formatCurrency:', value);
+    return '€0,00'; // Default fallback
   }
   
-  // Calculate annual fuel cost
-  let annualFuelCost;
-  if (fuelType === 'electric') {
-    // For electric vehicles (kWh/100km * annual mileage / 100)
-    annualFuelCost = (fuelConsumption * annualMileage / 100) * fuelPrice;
-    console.log('Annual fuel cost (electric):', annualFuelCost, 'CHF');
-  } else {
-    // For combustion engines (L/100km * annual mileage / 100)
-    annualFuelCost = (fuelConsumption * annualMileage / 100) * fuelPrice;
-    console.log('Annual fuel cost (combustion):', annualFuelCost, 'CHF');
-  }
+  // Get currency info from global context if available
+  const globalProductData = window._ltcGeminiProductData || {};
   
-  // Calculate annual tax (based on engine size and/or emissions)
-  // This is very simplified and should be replaced with actual tax calculations for Switzerland
-  let annualTax;
-  if (fuelType === 'electric') {
-    annualTax = 200; // Often reduced for electric vehicles
-    console.log('Annual tax (electric):', annualTax, 'CHF');
-  } else {
-    // Simplified calculation based on engine size
-    annualTax = engineSize < 1.6 ? 300 : 
-                engineSize < 2.0 ? 400 : 
-                engineSize < 3.0 ? 600 : 800;
-    console.log('Annual tax (based on engine size):', annualTax, 'CHF');
-  }
-  
-  // Calculate insurance cost (comprehensive)
-  // This is a simplified model - actual insurance would depend on many factors
-  let annualInsurance;
-  const insuranceCategory = carData.insuranceCategory || 'medium';
-  const baseInsurance = 1000; // Base comprehensive insurance
-  console.log('Insurance category:', insuranceCategory, 'Base insurance:', baseInsurance);
-  
-  if (insuranceCategory === 'low') {
-    annualInsurance = baseInsurance * 0.8;
-  } else if (insuranceCategory === 'high') {
-    annualInsurance = baseInsurance * 1.3;
-  } else {
-    annualInsurance = baseInsurance;
-  }
-  
-  // Adjust insurance based on car age
-  if (carAge > 5) {
-    annualInsurance *= 0.9;
-    console.log('Insurance reduced by 10% due to car age > 5');
-  }
-  if (carAge > 10) {
-    annualInsurance *= 0.9;
-    console.log('Insurance reduced by additional 10% due to car age > 10');
-  }
-  
-  console.log('Annual insurance after adjustments:', annualInsurance, 'CHF');
-  
-  // Calculate maintenance costs (increasing with car age)
-  let annualMaintenanceCost;
-  if (carAge < 3) {
-    annualMaintenanceCost = 500;
-  } else if (carAge < 7) {
-    annualMaintenanceCost = 800;
-  } else if (carAge < 12) {
-    annualMaintenanceCost = 1200;
-  } else {
-    annualMaintenanceCost = 1800;
-  }
-  
-  console.log('Base annual maintenance cost (by age):', annualMaintenanceCost, 'CHF');
-  
-  // Adjust maintenance cost for luxury or economy brands
-  const carBrand = carData.name.split(' ')[0].toLowerCase();
-  const luxuryBrands = ['mercedes', 'bmw', 'audi', 'lexus', 'porsche', 'maserati', 'jaguar', 'land rover'];
-  const economyBrands = ['dacia', 'skoda', 'suzuki', 'hyundai', 'kia'];
-  
-  console.log('Car brand for maintenance adjustment:', carBrand);
-  
-  if (luxuryBrands.includes(carBrand)) {
-    annualMaintenanceCost *= 1.5;
-    console.log('Maintenance cost increased by 50% for luxury brand');
-  } else if (economyBrands.includes(carBrand)) {
-    annualMaintenanceCost *= 0.8;
-    console.log('Maintenance cost reduced by 20% for economy brand');
-  }
-  
-  console.log('Annual maintenance cost after brand adjustment:', annualMaintenanceCost, 'CHF');
-  
-  // Calculate depreciation (simplified model)
-  let totalDepreciation;
-  const currentValue = purchasePrice;
-  let futureValue;
-  
-  if (carAge < 3) {
-    // Newer cars depreciate faster
-    futureValue = currentValue * Math.pow(0.85, ownershipDuration);
-    console.log('Using faster depreciation rate (0.85) for newer car');
-  } else if (carAge < 8) {
-    // Middle-aged cars depreciate moderately
-    futureValue = currentValue * Math.pow(0.9, ownershipDuration);
-    console.log('Using moderate depreciation rate (0.9) for middle-aged car');
-  } else {
-    // Older cars depreciate slower
-    futureValue = currentValue * Math.pow(0.95, ownershipDuration);
-    console.log('Using slower depreciation rate (0.95) for older car');
-  }
-  
-  console.log('Current value:', currentValue, 'CHF');
-  console.log('Estimated future value after', ownershipDuration, 'years:', futureValue, 'CHF');
-  
-  totalDepreciation = currentValue - futureValue;
-  const annualDepreciation = totalDepreciation / ownershipDuration;
-  
-  console.log('Total depreciation:', totalDepreciation, 'CHF');
-  console.log('Annual depreciation:', annualDepreciation, 'CHF');
-  
-  // Calculate NPV of annual costs over ownership period
-  let fuelCostNPV = 0;
-  let taxNPV = 0;
-  let insuranceNPV = 0;
-  let maintenanceNPV = 0;
-  
-  console.log('Calculating NPV for each cost category over', ownershipDuration, 'years...');
-  
-  for (let year = 1; year <= ownershipDuration; year++) {
-    const fuelNPVForYear = annualFuelCost / Math.pow(1 + discountRate, year);
-    const taxNPVForYear = annualTax / Math.pow(1 + discountRate, year);
-    const insuranceNPVForYear = annualInsurance / Math.pow(1 + discountRate, year);
-    const maintenanceNPVForYear = annualMaintenanceCost / Math.pow(1 + discountRate, year);
+  // Check if we have product data with currency info (function scope or global)
+  if (typeof productData !== 'undefined' && productData && productData.originalCurrency) {
+    const currency = productData.originalCurrency;
+    const formattedValue = value.toFixed(2).replace('.', ',');
     
-    console.log(`Year ${year} NPV - Fuel: ${fuelNPVForYear.toFixed(2)}, Tax: ${taxNPVForYear.toFixed(2)}, Insurance: ${insuranceNPVForYear.toFixed(2)}, Maintenance: ${maintenanceNPVForYear.toFixed(2)}`);
+    switch (currency) {
+      case 'CHF':
+        return 'CHF ' + formattedValue;
+      case 'USD':
+        return '$' + formattedValue;
+      case 'GBP':
+        return '£' + formattedValue;
+      case 'EUR':
+      default:
+        return '€' + formattedValue;
+    }
+  } else if (globalProductData.originalCurrency) {
+    // Try to use currency from global context
+    const currency = globalProductData.originalCurrency;
+    const formattedValue = value.toFixed(2).replace('.', ',');
     
-    fuelCostNPV += fuelNPVForYear;
-    taxNPV += taxNPVForYear;
-    insuranceNPV += insuranceNPVForYear;
-    maintenanceNPV += maintenanceNPVForYear;
-  }
-  
-  console.log('Total NPV - Fuel:', fuelCostNPV, 'Tax:', taxNPV, 'Insurance:', insuranceNPV, 'Maintenance:', maintenanceNPV);
-  
-  // Calculate total ownership cost
-  const totalOwnershipCost = totalDepreciation + fuelCostNPV + taxNPV + insuranceNPV + maintenanceNPV;
-  const monthlyCost = totalOwnershipCost / (ownershipDuration * 12);
-  
-  console.log('Total ownership cost:', totalOwnershipCost, 'CHF');
-  console.log('Monthly cost:', monthlyCost, 'CHF');
-  
-  const result = {
-    purchasePrice: purchasePrice,
-    totalOwnershipCost: totalOwnershipCost,
-    monthlyCost: monthlyCost,
-    depreciationCost: totalDepreciation,
-    fuelCostNPV: fuelCostNPV,
-    taxCostNPV: taxNPV,
-    insuranceCostNPV: insuranceNPV,
-    maintenanceCostNPV: maintenanceNPV,
-    annualFuelCost: annualFuelCost,
-    annualTax: annualTax,
-    annualInsurance: annualInsurance,
-    annualMaintenanceCost: annualMaintenanceCost,
-    annualDepreciation: annualDepreciation,
-    ownershipDuration: ownershipDuration,
-    carDetails: {
-      year: yearOfManufacture,
-      age: carAge,
-      mileage: mileage,
-      fuelType: fuelType,
-      fuelConsumption: fuelConsumption
-    }
-  };
-  
-  console.log('Returning car cost calculation result:', result);
-  return result;
-}
-
-// Display car lifetime cost on the page
-function displayCarLifetimeCost(carData, calculationResults) {
-  console.log('Displaying car lifetime cost with data:', carData);
-  console.log('Calculation results for display:', calculationResults);
-  
-  // Create container for our display
-  const container = document.createElement('div');
-  container.id = 'lifetime-cost-calculator';
-  container.className = 'ltc-container';
-  
-  console.log('Created container element with ID:', container.id);
-  
-  // Format currency values
-  const formatCurrency = (value) => {
-    if (typeof value !== 'number' || isNaN(value)) {
-      console.error('Invalid value passed to formatCurrency:', value);
-      return 'CHF 0.00'; // Default fallback
-    }
-    return 'CHF ' + value.toFixed(2).replace('.', ',');
-  };
-  
-  // Create content
-  console.log('Building HTML content for car cost display');
-  container.innerHTML = `
-    <div class="ltc-header">CAR OWNERSHIP COST CALCULATOR</div>
-    <div class="ltc-content">
-      <div class="ltc-total">
-        Total Cost of Ownership (${calculationResults.ownershipDuration} years): 
-        <span class="ltc-highlight">${formatCurrency(calculationResults.totalOwnershipCost)}</span>
-      </div>
-      
-      <div class="ltc-monthly">
-        Monthly Cost: 
-        <span class="ltc-highlight">${formatCurrency(calculationResults.monthlyCost)}</span>
-      </div>
-      
-      <div class="ltc-breakdown">
-        <div class="ltc-breakdown-title">Breakdown:</div>
-        <div class="ltc-breakdown-item">
-          • Purchase Price: ${formatCurrency(calculationResults.purchasePrice)}
-        </div>
-        <div class="ltc-breakdown-item">
-          • Depreciation: ${formatCurrency(calculationResults.depreciationCost)}
-        </div>
-        <div class="ltc-breakdown-item">
-          • Fuel Cost: ${formatCurrency(calculationResults.fuelCostNPV)}
-        </div>
-        <div class="ltc-breakdown-item">
-          • Tax: ${formatCurrency(calculationResults.taxCostNPV)}
-        </div>
-        <div class="ltc-breakdown-item">
-          • Insurance: ${formatCurrency(calculationResults.insuranceCostNPV)}
-        </div>
-        <div class="ltc-breakdown-item">
-          • Maintenance: ${formatCurrency(calculationResults.maintenanceCostNPV)}
-        </div>
-      </div>
-      
-      <div class="ltc-car-info">
-        ${carData.year} ${carData.name} • ${carData.mileage} km • ${carData.fuelType}
-        <br>
-        Fuel Consumption: ${carData.fuelConsumption} ${carData.fuelType === 'electric' ? 'kWh/100km' : 'L/100km'}
-      </div>
-      
-      <button class="ltc-details-button">Show Calculation Details</button>
-      <button class="ltc-save-button">Save This Car</button>
-    </div>
-  `;
-  
-  // Find a good place to insert our container
-  console.log('Looking for target element to insert container');
-  const targetElement = document.querySelector('.product-details, .product-info, .product-summary');
-  if (targetElement) {
-    console.log('Found target element:', targetElement);
-    targetElement.parentNode.insertBefore(container, targetElement.nextSibling);
-  } else {
-    console.log('Target element not found, looking for heading');
-    // Fallback: insert after the first heading
-    const heading = document.querySelector('h1');
-    if (heading) {
-      console.log('Found heading element:', heading);
-      heading.parentNode.insertBefore(container, heading.nextSibling);
-    } else {
-      console.log('No suitable target found, appending to body');
-      // Last resort: append to body
-      document.body.appendChild(container);
+    switch (currency) {
+      case 'CHF':
+        return 'CHF ' + formattedValue;
+      case 'USD':
+        return '$' + formattedValue;
+      case 'GBP':
+        return '£' + formattedValue;
+      case 'EUR':
+      default:
+        return '€' + formattedValue;
     }
   }
   
-  console.log('Container inserted into DOM');
-  
-  // Add event listener for the details button
-  const detailsButton = container.querySelector('.ltc-details-button');
-  detailsButton.addEventListener('click', () => {
-    console.log('Details button clicked');
-    showCarCalculationDetails(carData, calculationResults);
-  });
-
-  // Add event listener for the save button
-  const saveButton = container.querySelector('.ltc-save-button');
-  saveButton.addEventListener('click', () => {
-    console.log('Save button clicked');
-    saveProduct(carData, calculationResults);
-  });
-  
-  console.log('Car cost display complete');
-}
-
-// Show detailed car calculation information
-function showCarCalculationDetails(carData, calculationResults) {
-  console.log('Showing detailed car calculation modal for:', carData.name);
-  
-  // Create modal for detailed information
-  const modal = document.createElement('div');
-  modal.className = 'ltc-modal';
-  
-  // Format currency values
-  const formatCurrency = (value) => {
+  // Check hostname for Swiss site to default to CHF
+  if (window.location.hostname.includes('.ch')) {
     return 'CHF ' + value.toFixed(2).replace('.', ',');
-  };
+  }
   
-  console.log('Building car calculation details modal content');
-  
-  // Create content
-  modal.innerHTML = `
-    <div class="ltc-modal-content">
-      <span class="ltc-modal-close">&times;</span>
-      <h2>Car Ownership Cost Calculation Details</h2>
-      
-      <h3>Car Information</h3>
-      <p>
-        <strong>Make/Model:</strong> ${carData.name}<br>
-        <strong>Year:</strong> ${carData.year} (Age: ${calculationResults.carDetails.age} years)<br>
-        <strong>Mileage:</strong> ${carData.mileage} km<br>
-        <strong>Fuel Type:</strong> ${carData.fuelType}<br>
-        <strong>Fuel Consumption:</strong> ${carData.fuelConsumption} ${carData.fuelType === 'electric' ? 'kWh/100km' : 'L/100km'}<br>
-        <strong>Engine Size:</strong> ${carData.engineSize || 'Unknown'}<br>
-        <strong>Transmission:</strong> ${carData.transmission || 'Unknown'}
-      </p>
-      
-      <h3>Annual Costs</h3>
-      <p>
-        <strong>Depreciation:</strong> ${formatCurrency(calculationResults.annualDepreciation)}/year<br>
-        <strong>Fuel:</strong> ${formatCurrency(calculationResults.annualFuelCost)}/year<br>
-        <strong>Tax:</strong> ${formatCurrency(calculationResults.annualTax)}/year<br>
-        <strong>Insurance:</strong> ${formatCurrency(calculationResults.annualInsurance)}/year<br>
-        <strong>Maintenance:</strong> ${formatCurrency(calculationResults.annualMaintenanceCost)}/year
-      </p>
-      
-      <h3>Total Costs (${calculationResults.ownershipDuration} years)</h3>
-      <p>
-        <strong>Purchase Price:</strong> ${formatCurrency(calculationResults.purchasePrice)}<br>
-        <strong>Depreciation:</strong> ${formatCurrency(calculationResults.depreciationCost)}<br>
-        <strong>Fuel (NPV):</strong> ${formatCurrency(calculationResults.fuelCostNPV)}<br>
-        <strong>Tax (NPV):</strong> ${formatCurrency(calculationResults.taxCostNPV)}<br>
-        <strong>Insurance (NPV):</strong> ${formatCurrency(calculationResults.insuranceCostNPV)}<br>
-        <strong>Maintenance (NPV):</strong> ${formatCurrency(calculationResults.maintenanceCostNPV)}<br>
-        <strong>Total Ownership Cost:</strong> ${formatCurrency(calculationResults.totalOwnershipCost)}<br>
-        <strong>Monthly Cost:</strong> ${formatCurrency(calculationResults.monthlyCost)}
-      </p>
-      
-      <p class="ltc-note">
-        Note: All future costs are calculated using Net Present Value (NPV) to account for the time value of money.
-      </p>
-    </div>
-  `;
-  
-  console.log('Adding modal to DOM');
-  
-  // Add modal to page
-  document.body.appendChild(modal);
-  
-  // Add event listener for close button
-  const closeButton = modal.querySelector('.ltc-modal-close');
-  closeButton.addEventListener('click', () => {
-    console.log('Modal close button clicked');
-    document.body.removeChild(modal);
-  });
-  
-  // Close modal when clicking outside the content
-  modal.addEventListener('click', (event) => {
-    if (event.target === modal) {
-      console.log('Modal background clicked, closing');
-      document.body.removeChild(modal);
-    }
-  });
-  
-  console.log('Car calculation details modal displayed');
+  // Default to EUR if no currency info available
+  return '€' + value.toFixed(2).replace('.', ',');
 }
-
-// Initialize the content script
-console.log('Starting Lifetime Cost Calculator initialization');
-initLifetimeCostCalculator();

@@ -24,9 +24,11 @@
   "content_scripts": [
     {
       "matches": [
-        "https://*.saturn.de/*/product/*", 
+        "https://*.saturn.de/*/product/*",
         "https://*.saturn.de/de/product/*",
         "https://saturn.de/de/product/*",
+        "https://www.zara.com/*/product/*",
+        "https://www.zara.com/*",
         "https://*.tutti.ch/*/anzeige/*",
         "https://tutti.ch/*/anzeige/*",
         "https://*.tutti.ch/*/auto/*",
@@ -51,6 +53,7 @@
   ],
   "host_permissions": [
     "https://*.saturn.de/*",
+    "https://www.zara.com/*",
     "https://*.digitec.ch/*",
     "https://*.tutti.ch/*"
   ]

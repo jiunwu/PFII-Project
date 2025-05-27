@@ -5,22 +5,33 @@ document.addEventListener('DOMContentLoaded', function() {
   loadSavedPreferences();
   
   // Add event listener for save button
-  document.getElementById('saveButton').addEventListener('click', savePreferences);
+  const saveBtn = document.getElementById('saveButton');
+  if (saveBtn) saveBtn.addEventListener('click', savePreferences);
 
   // Load saved Gemini API key
   chrome.storage.sync.get(['geminiApiKey'], function(result) {
     if (result.geminiApiKey) {
-      document.getElementById('geminiApiKey').value = result.geminiApiKey;
+      const apiKeyInput = document.getElementById('geminiApiKey');
+      if (apiKeyInput) apiKeyInput.value = result.geminiApiKey;
     }
   });
-});
 
-document.getElementById('saveApiKey').addEventListener('click', function() {
-  const apiKey = document.getElementById('geminiApiKey').value;
-  chrome.storage.sync.set({ geminiApiKey: apiKey }, function() {
-    document.getElementById('status').textContent = 'API key saved!';
-    setTimeout(() => document.getElementById('status').textContent = '', 2000);
-  });
+  // Add event listener for API key save button
+  const saveApiKeyBtn = document.getElementById('saveApiKey');
+  if (saveApiKeyBtn) {
+    saveApiKeyBtn.addEventListener('click', function() {
+      const apiKeyInput = document.getElementById('geminiApiKey');
+      if (!apiKeyInput) return;
+      const apiKey = apiKeyInput.value;
+      chrome.storage.sync.set({ geminiApiKey: apiKey }, function() {
+        const status = document.getElementById('status');
+        if (status) {
+          status.textContent = 'API key saved!';
+          setTimeout(() => status.textContent = '', 2000);
+        }
+      });
+    });
+  }
 });
 
 /**
@@ -40,6 +51,23 @@ function loadSavedPreferences() {
       document.getElementById('washingMachineLifespan').value = preferences.applianceLifespans.washingMachine;
       document.getElementById('dishwasherLifespan').value = preferences.applianceLifespans.dishwasher;
       document.getElementById('dryerLifespan').value = preferences.applianceLifespans.dryer;
+      
+      // Set car-specific settings
+      if (document.getElementById('carOwnershipDuration') && preferences.carOwnershipDuration) {
+        document.getElementById('carOwnershipDuration').value = preferences.carOwnershipDuration;
+      }
+      
+      if (document.getElementById('annualMileage') && preferences.annualMileage) {
+        document.getElementById('annualMileage').value = preferences.annualMileage;
+      }
+      
+      if (document.getElementById('gasolinePrice') && preferences.gasolinePrice) {
+        document.getElementById('gasolinePrice').value = preferences.gasolinePrice;
+      }
+      
+      if (document.getElementById('dieselPrice') && preferences.dieselPrice) {
+        document.getElementById('dieselPrice').value = preferences.dieselPrice;
+      }
     }
   });
 }
@@ -75,6 +103,23 @@ function savePreferences() {
     }
   };
   
+  // Add car-specific settings
+  if (document.getElementById('carOwnershipDuration')) {
+    preferences.carOwnershipDuration = getValidatedNumberInput('carOwnershipDuration', 1, 15, 5);
+  }
+  
+  if (document.getElementById('annualMileage')) {
+    preferences.annualMileage = getValidatedNumberInput('annualMileage', 1000, 50000, 15000);
+  }
+  
+  if (document.getElementById('gasolinePrice')) {
+    preferences.gasolinePrice = getValidatedNumberInput('gasolinePrice', 0.1, 5, 1.90);
+  }
+  
+  if (document.getElementById('dieselPrice')) {
+    preferences.dieselPrice = getValidatedNumberInput('dieselPrice', 0.1, 5, 1.95);
+  }
+  
   // Save to storage
   chrome.storage.sync.set({ preferences: preferences }, function() {
     showStatusMessage('Settings saved successfully!', 'success');
@@ -82,7 +127,7 @@ function savePreferences() {
     // Notify content scripts that preferences have changed
     chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
       if (tabs[0]) {
-        chrome.tabs.sendMessage(tabs[0].id, {type: 'PREFERENCES_UPDATED'});
+        safeSendMessage({type: 'PREFERENCES_UPDATED'}, null);
       }
     });
   });
@@ -122,4 +167,25 @@ function showStatusMessage(message, type) {
   setTimeout(function() {
     statusElement.style.display = 'none';
   }, 3000);
+}
+
+/**
+ * Safely send a message using chrome.runtime.sendMessage
+ * @param {Object} message - Message to send
+ * @param {Function} callback - Callback function to handle the response
+ */
+function safeSendMessage(message, callback) {
+  try {
+    chrome.runtime.sendMessage(message, (response) => {
+      if (chrome.runtime.lastError) {
+        console.warn('[LTC DEBUG] sendMessage error:', chrome.runtime.lastError.message);
+        if (callback) callback(null);
+        return;
+      }
+      if (callback) callback(response);
+    });
+  } catch (e) {
+    console.warn('[LTC DEBUG] sendMessage exception:', e);
+    if (callback) callback(null);
+  }
 }

@@ -12,45 +12,56 @@ if (document.readyState === 'complete' || document.readyState === 'interactive')
   window.addEventListener('DOMContentLoaded', initLifetimeCostCalculator);
 }
 
+
+// Ensure digitecScraper is defined at the top level
+let digitecScraper = null;
+if (window.location.hostname.includes('digitec.ch')) {
+  if (window.DigitecScraper) {
+    digitecScraper = new window.DigitecScraper();
+  }
+}
+
 // Main function to initialize the content script
 async function initLifetimeCostCalculator() {
   console.log('initLifetimeCostCalculator called');
   console.log('Lifetime Cost Calculator: Content script initialized');
 
-  try {
-    // Check if we're on a product page
-    if (await isProductPage()) {
-      console.log('Product page detected, extracting data...');
+  // Check if we're on a product page
+  console.log('Checking if current page is a product page...');
+  if (await isProductPage()) {
+    console.log('Product page detected, extracting data...');
 
-      try {
-        // Extract product data from the page
-        const productData = await extractProductData();
+    // Extract product data from the page
+    const productData = await extractProductData();
+    console.log('Extracted product data:', productData);
 
-        if (productData) {
-          console.log('Product data extracted successfully:', productData);
-          
-          // Get user preferences from storage
-          chrome.runtime.sendMessage({ type: 'GET_PREFERENCES' }, (response) => {
-            try {
-              console.log('User preferences received:', response);
-              let preferences = response?.preferences;
-              
-              if (!preferences) {
-                console.warn('No preferences received, using defaults');
-                preferences = {
-                  electricityRate: 0.30,
-                  discountRate: 0.02,
-                  applianceLifespans: { clothing: 5 },
-                  maintenanceCosts: { clothing: { averageRepairCost: 20, expectedRepairs: 0 } }
-                };
-              }
-              
-              // Calculate lifetime costs
-              const calculationResults = calculateLifetimeCost(productData, preferences);
-              console.log('Calculation results:', calculationResults);
+    if (productData) {
+      // Get user preferences from storage
+      console.log('Getting user preferences...');
+      chrome.runtime.sendMessage({ type: 'GET_PREFERENCES' }, (response) => {
+        console.log('User preferences received:', response);
+        if (response && response.preferences) {
+          // Calculate costs based on product type
+          let calculationResults;
+          console.log('Product type detected:', productData.productType);
+          if (productData.productType === 'car') {
+            console.log('Calculating car lifetime costs...');
+            calculationResults = calculateCarLifetimeCost(productData, response.preferences);
+            console.log('Car calculation results:', calculationResults);
+          } else {
+            console.log('Calculating appliance lifetime costs...');
+            calculationResults = calculateLifetimeCost(productData, response.preferences);
+            console.log('Appliance calculation results:', calculationResults);
+          }
 
-              // Display results on the page
-              displayLifetimeCost(productData, calculationResults);
+          // Display results on the page
+          if (productData.productType === 'car') {
+            console.log('Displaying car lifetime cost...');
+            displayCarLifetimeCost(productData, calculationResults);
+          } else {
+            console.log('Displaying appliance lifetime cost...');
+            displayLifetimeCost(productData, calculationResults);
+          }
 
               // Notify background script that a product was detected
               chrome.runtime.sendMessage({ 
@@ -150,18 +161,48 @@ async function isProductPage() {
   }
   
   // Standard checks for other sites
-  if (!currentUrl.includes('/product/') && !currentUrl.includes('saturn.de')) {
+
+  console.log('Checking URL:', currentUrl);
+  
+  const isTuttiCar = currentUrl.includes('tutti.ch') && 
+                     (currentUrl.includes('/auto/') || 
+                      currentUrl.includes('/automobili/') || 
+                      currentUrl.includes('/autos/'));
+  
+  console.log('Is tutti.ch car page?', isTuttiCar);
+  
+  if (!currentUrl.includes('/product/') && 
+      !currentUrl.includes('saturn.de') && 
+      !isTuttiCar) {
     console.log('Not a product page based on URL');
     return false;
+  }else if (currentUrl.includes('digitec.ch')) {
+    // Improved: check for product ID in URL and product title element
+    const productIdPattern = /-(\d+)(#|$|\?)/;
+    const hasProductId = productIdPattern.test(currentUrl);
+    const hasProductTitle = document.querySelector('h1[data-testid="product-title"], h1.product-title, .product-title, h1');
+    if (!hasProductId || !hasProductTitle) {
+      console.log('Not a Digitec product page based on URL or missing product title');
+      return false;
+    }
+    return true;
   }
+
+  console.log('URL pattern matches a product page, checking content...');
 
   // Use Gemini API to extract product data
   const pageText = document.body.innerText;
-  const productData = await callGeminiAPIForProductData(pageText);
+  console.log('Page text length for Gemini API:', pageText.length);
+  console.log('Calling Gemini API with isCar param:', isTuttiCar);
+  
+  const productData = await callGeminiAPIForProductData(pageText, isTuttiCar);
+  console.log('Gemini API response:', productData);
+  
   if (!productData) {
     console.log('Gemini API did not return product data');
     return false;
   }
+  
   const productTitleElement = productData.name;
   const priceElement = productData.price;
   console.log('Product title element (Gemini):', productTitleElement);
@@ -172,6 +213,7 @@ async function isProductPage() {
   }
   // Store productData for later use
   window._ltcGeminiProductData = productData;
+  console.log('Stored Gemini product data in window object:', window._ltcGeminiProductData);
   return true;
 }
 
@@ -182,7 +224,7 @@ async function callGeminiAPIForProductData(pageText) {
     chrome.storage.sync.get(['geminiApiKey'], async function(result) {
       const apiKey = result.geminiApiKey;
       if (!apiKey) {
-        console.error('Gemini API key not set.');
+        console.error('[LTC DEBUG] Gemini API key not set.');
         resolve(null);
         return;
       }
@@ -233,11 +275,13 @@ ${pageText}`;
             contents: [{ parts: [{ text: prompt }] }]
           })
         });
+        console.log('Gemini API HTTP status:', response.status);
         const data = await response.json();
         console.log('Gemini API raw response:', data);
         try {
           // Remove markdown code block markers if present
           let text = data.candidates[0].content.parts[0].text;
+          console.log('Gemini API raw text:', text);
           text = text.replace(/```[a-zA-Z]*\n?|```/g, '').trim();
           const parsedData = JSON.parse(text);
           
@@ -258,11 +302,11 @@ ${pageText}`;
           
           resolve(parsedData);
         } catch (e) {
-          console.error('Gemini API response parsing error:', e, data);
+          console.error('[LTC DEBUG] Gemini API response parsing error:', e, data);
           resolve(null);
         }
       } catch (err) {
-        console.error('Error calling Gemini API:', err);
+        console.error('[LTC DEBUG] Error calling Gemini API:', err);
         resolve(null);
       }
     });
@@ -272,11 +316,30 @@ ${pageText}`;
 // Extract product data from the page using Gemini API, with fallback for Zara
 async function extractProductData() {
   try {
+    const currentUrl = window.location.href;
+    if (currentUrl.includes('digitec.ch') && digitecScraper) {
+      const data = digitecScraper.extractProductData();
+      if (data && data.name && data.price) {
+        return data;
+      }
+    }
+    console.log('Extracting product data from page...');
+
     const pageText = document.body.innerText;
-    let productData = await callGeminiAPIForProductData(pageText);
-    console.log('extractProductData result:', productData);
+    console.log('Page text length:', pageText.length);
+    
+    const isTuttiCar = window.location.href.includes('tutti.ch') && 
+                       (window.location.href.includes('/auto/') || 
+                        window.location.href.includes('/automobili/') || 
+                        window.location.href.includes('/autos/'));
+    
+    console.log('Is tutti.ch car listing?', isTuttiCar);
+    
+    const productData = await callGeminiAPIForProductData(pageText, isTuttiCar);
+    console.log('Product data from Gemini API:', productData);
+    
     if (productData && productData.name && productData.price) {
-      console.log('Product data extracted:', productData);
+      console.log('Product data extracted successfully:', productData);
       return productData;
     }
     // Fallback: Try to extract from Zara DOM if Gemini fails

@@ -26,42 +26,44 @@ async function initLifetimeCostCalculator() {
   console.log('initLifetimeCostCalculator called');
   console.log('Lifetime Cost Calculator: Content script initialized');
 
-  // Check if we're on a product page
-  console.log('Checking if current page is a product page...');
-  if (await isProductPage()) {
-    console.log('Product page detected, extracting data...');
+  try {
+    // Check if we're on a product page
+    console.log('Checking if current page is a product page...');
+    if (await isProductPage()) {
+      console.log('Product page detected, extracting data...');
 
-    // Extract product data from the page
-    const productData = await extractProductData();
-    console.log('Extracted product data:', productData);
+      try {
+        // Extract product data from the page
+        const productData = await extractProductData();
+        console.log('Extracted product data:', productData);
 
-    if (productData) {
-      // Get user preferences from storage
-      console.log('Getting user preferences...');
-      chrome.runtime.sendMessage({ type: 'GET_PREFERENCES' }, (response) => {
-        console.log('User preferences received:', response);
-        if (response && response.preferences) {
-          // Calculate costs based on product type
-          let calculationResults;
-          console.log('Product type detected:', productData.productType);
-          if (productData.productType === 'car') {
-            console.log('Calculating car lifetime costs...');
-            calculationResults = calculateCarLifetimeCost(productData, response.preferences);
-            console.log('Car calculation results:', calculationResults);
-          } else {
-            console.log('Calculating appliance lifetime costs...');
-            calculationResults = calculateLifetimeCost(productData, response.preferences);
-            console.log('Appliance calculation results:', calculationResults);
-          }
+        if (productData) {
+          // Get user preferences from storage
+          console.log('Getting user preferences...');
+          chrome.runtime.sendMessage({ type: 'GET_PREFERENCES' }, (response) => {
+            console.log('User preferences received:', response);
+            if (response && response.preferences) {
+              // Calculate costs based on product type
+              let calculationResults;
+              console.log('Product type detected:', productData.productType);
+              if (productData.productType === 'car') {
+                console.log('Calculating car lifetime costs...');
+                calculationResults = calculateCarLifetimeCost(productData, response.preferences);
+                console.log('Car calculation results:', calculationResults);
+              } else {
+                console.log('Calculating appliance lifetime costs...');
+                calculationResults = calculateLifetimeCost(productData, response.preferences);
+                console.log('Appliance calculation results:', calculationResults);
+              }
 
-          // Display results on the page
-          if (productData.productType === 'car') {
-            console.log('Displaying car lifetime cost...');
-            displayCarLifetimeCost(productData, calculationResults);
-          } else {
-            console.log('Displaying appliance lifetime cost...');
-            displayLifetimeCost(productData, calculationResults);
-          }
+              // Display results on the page
+              if (productData.productType === 'car') {
+                console.log('Displaying car lifetime cost...');
+                displayCarLifetimeCost(productData, calculationResults);
+              } else {
+                console.log('Displaying appliance lifetime cost...');
+                displayLifetimeCost(productData, calculationResults);
+              }
 
               // Notify background script that a product was detected
               chrome.runtime.sendMessage({ 
@@ -69,9 +71,8 @@ async function initLifetimeCostCalculator() {
                 productData: productData,
                 calculationResults: calculationResults
               });
-            } catch (prefError) {
-              console.error('Error processing preferences:', prefError);
-              // Try to display with minimal calculation
+              
+              // Try to display with minimal calculation if needed
               const fallbackResults = {
                 totalLifetimeCost: productData.price,
                 purchasePrice: productData.price,

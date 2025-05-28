@@ -102,6 +102,28 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     });
     return true;
   }
+
+  if (message.type === 'SAVE_CAR_CALCULATION') {
+    console.log('SAVE_CAR_CALCULATION message received:', message.productData, message.calculationResults);
+    chrome.storage.local.get({ savedCarCalculations: [] }, (data) => {
+      const savedCalculations = data.savedCarCalculations;
+      savedCalculations.push({
+        productData: message.productData,
+        calculationResults: message.calculationResults,
+        savedAt: new Date().toISOString()
+      });
+      chrome.storage.local.set({ savedCarCalculations: savedCalculations }, () => {
+        if (chrome.runtime.lastError) {
+          console.error('Error saving car calculation:', chrome.runtime.lastError);
+          sendResponse({ status: 'error', message: chrome.runtime.lastError.message });
+        } else {
+          console.log('Car calculation saved successfully', savedCalculations);
+          sendResponse({ status: 'success' });
+        }
+      });
+    });
+    return true; // Required for asynchronous response
+  }
 });
 
 // Listen for tab updates to check if we're on a product page
@@ -123,39 +145,10 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 
   if (changeInfo.status === 'complete' && tab.url) {
     // Check if the URL matches a product page pattern
-    const isProductPage = tab.url.match(/saturn\.de\/.*\/product\//) || tab.url.match(/zara\.com\/.*\/product\//);
-    
-    // Check for tutti.ch car pages
-    const isTuttiCarPage = tab.url.match(/tutti\.ch\/.*\/(auto|automobili|autos)\//);
-    
-    if (isProductPage || isTuttiCarPage) {
-      console.log('Product page detected:', tab.url);
-      // The content script will be automatically injected based on the manifest.json matches
-      console.log('Injecting content script into tab:', tabId);
-     
-    } else {
-      // Reset badge if not on a product page
-      chrome.action.setBadgeText({ 
-        text: '',
-        tabId: tabId
-      });
-    }
+    // This check is simplified as content scripts handle detailed detection
+    // The primary purpose here is for badge updates if needed, though content script can also manage this.
+    console.log('Tab update complete for URL:', tab.url);
+    // The content script will be automatically injected based on the manifest.json matches
+    // and will send a message (PRODUCT_DETECTED or NO_PRODUCT) to update the badge.
   }
 });
-
-// Determine product type based on page content
-function determineProductType() {
-  const pageText = document.body.textContent.toLowerCase();
-  if (pageText.includes('kühlschrank') || pageText.includes('refrigerator') || pageText.includes('fridge')) {
-    return 'refrigerator';
-  } else if (pageText.includes('waschmaschine') || pageText.includes('washing machine')) {
-    return 'washingMachine';
-  } else if (pageText.includes('geschirrspüler') || pageText.includes('dishwasher')) {
-    return 'dishwasher';
-  } else if (pageText.includes('trockner') || pageText.includes('dryer')) {
-    return 'dryer';
-  } else if (pageText.includes('clothing') || pageText.includes('shirt') || pageText.includes('pants') || pageText.includes('zara')) {
-    return 'clothing';
-  }
-  return 'unknown';
-}

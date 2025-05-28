@@ -336,3 +336,140 @@ function determineProductType() {
 if (typeof module !== 'undefined') {
   module.exports = LifetimeCalculator;
 }
+
+// Calculate lifetime cost based on product data and user preferences
+function calculateLifetimeCost(productData, preferences) {
+  console.log('Calculating lifetime cost for:', productData, preferences);
+
+  if (!productData) {
+    console.error('Product data is undefined in calculateLifetimeCost');
+    return null;
+  }
+  
+  if (!preferences) {
+    console.warn('Preferences are undefined in calculateLifetimeCost, using defaults');
+    preferences = {
+      electricityRate: 0.30,
+      discountRate: 0.02,
+      applianceLifespans: { refrigerator: 10, washingMachine: 8, dishwasher: 9, dryer: 8, clothing: 5, unknown: 5 },
+      maintenanceCosts: {
+        refrigerator: { averageRepairCost: 350, expectedRepairs: 2 },
+        washingMachine: { averageRepairCost: 250, expectedRepairs: 1 },
+        dishwasher: { averageRepairCost: 200, expectedRepairs: 1 },
+        dryer: { averageRepairCost: 200, expectedRepairs: 1 },
+        clothing: { averageRepairCost: 20, expectedRepairs: 0 },
+        unknown: { averageRepairCost: 100, expectedRepairs: 1 }
+      }
+    };
+  }
+
+  if (typeof productData.price !== 'number' || isNaN(productData.price)) {
+    console.warn('Invalid price in product data:', productData.price);
+    productData.price = 0;
+  }
+
+  if (productData.productType === 'clothing') {
+    try {
+      let material = (productData.material || '').toLowerCase();
+      let quality = 'medium';
+      let lifespan = 5; 
+      if (material.includes('wool') || material.includes('cashmere')) { quality = 'high'; lifespan = 20; }
+      else if (material.includes('cotton') || material.includes('linen')) { quality = 'medium'; lifespan = 10; }
+      else if (material.includes('polyester') || material.includes('synthetic')) { quality = 'low'; lifespan = 5; }
+      if (material.includes('cheap') || material.includes('low quality')) { lifespan = 2; quality = 'low'; }
+      else if (material.includes('high quality')) { lifespan = 20; quality = 'high'; }
+
+      const purchasePrice = productData.price;
+      const annualCost = purchasePrice / lifespan;
+      let maintenanceCostPerYear = 0;
+      let washesPerYear = 40;
+      if (quality === 'low' || material.includes('polyester') || material.includes('synthetic')) {
+        washesPerYear = 60;
+      }
+      maintenanceCostPerYear = washesPerYear * 0.5; 
+      const totalMaintenanceCost = maintenanceCostPerYear * lifespan;
+      const totalLifetimeCost = purchasePrice + totalMaintenanceCost;
+    
+      return {
+        purchasePrice, annualCost, lifespan, material, quality, 
+        maintenanceCostPerYear, totalMaintenanceCost, totalLifetimeCost,
+        productType: 'clothing',
+        breakdown: { purchasePrice, annualCost, lifespan, material, quality, maintenanceCostPerYear, totalMaintenanceCost }
+      };
+    } catch (error) {
+      console.error('Error calculating clothing lifetime cost:', error);
+      return {
+        purchasePrice: productData.price, annualCost: productData.price / 5, lifespan: 5,
+        material: productData.material || 'Unknown', quality: 'medium',
+        maintenanceCostPerYear: 20, totalMaintenanceCost: 100,
+        totalLifetimeCost: productData.price + 100, productType: 'clothing'
+      };
+    }
+  }
+  
+  return {
+    purchasePrice: productData.price, energyCostNPV: 0, maintenanceCostNPV: 0,
+    totalLifetimeCost: productData.price, annualEnergyConsumption: 0, annualEnergyCost: 0,
+    lifespan: 5, energyEfficiencyClass: 'Unknown', productType: productData.productType || 'unknown'
+  };
+}
+
+function calculateCarLifetimeCost(productData, preferences) {
+  console.log('Calculating Car Lifetime Cost with:', productData, preferences);
+
+  const { price, year, mileage, fuelType, fuelConsumption } = productData;
+  const { 
+    carOwnershipDuration = 5, annualMileage = 15000,
+    fuelPrices = { petrol: 1.8, diesel: 1.9, electric: 0.25 },
+    carInsuranceAnnual = 1000, carTaxAnnual = 300, 
+    carMaintenancePerKm = 0.05, discountRate = 0.02
+  } = preferences;
+
+  const purchasePrice = parseFloat(price) || 0;
+  const carAge = new Date().getFullYear() - (parseInt(year) || new Date().getFullYear());
+
+  let estimatedResaleValue = purchasePrice * Math.pow(0.85, carOwnershipDuration);
+  if (estimatedResaleValue < 0) estimatedResaleValue = 0;
+  const totalDepreciation = purchasePrice - estimatedResaleValue;
+  const annualDepreciation = totalDepreciation / carOwnershipDuration;
+
+  const consumption = parseFloat(fuelConsumption) || (fuelType === 'electric' ? 20 : 8);
+  const fuelPrice = fuelPrices[fuelType?.toLowerCase()] || fuelPrices.petrol;
+  const annualFuelCost = (annualMileage / 100) * consumption * fuelPrice;
+  
+  let totalFuelCost = 0;
+  for (let i = 0; i < carOwnershipDuration; i++) {
+    totalFuelCost += annualFuelCost / Math.pow(1 + discountRate, i + 1);
+  }
+
+  let totalInsuranceCost = 0;
+  for (let i = 0; i < carOwnershipDuration; i++) {
+    totalInsuranceCost += carInsuranceAnnual / Math.pow(1 + discountRate, i + 1);
+  }
+
+  let totalTaxCost = 0;
+  for (let i = 0; i < carOwnershipDuration; i++) {
+    totalTaxCost += carTaxAnnual / Math.pow(1 + discountRate, i + 1);
+  }
+
+  const annualMaintenanceCost = annualMileage * carMaintenancePerKm;
+  let totalMaintenanceCost = 0;
+  for (let i = 0; i < carOwnershipDuration; i++) {
+    totalMaintenanceCost += annualMaintenanceCost / Math.pow(1 + discountRate, i + 1);
+  }
+
+  const totalRunningCostsNPV = totalFuelCost + totalInsuranceCost + totalTaxCost + totalMaintenanceCost;
+  const totalNetOwnershipCost = totalDepreciation + totalRunningCostsNPV; 
+  const monthlyCost = totalNetOwnershipCost / (carOwnershipDuration * 12);
+
+  return {
+    productType: 'car', purchasePrice, year: productData.year, make: productData.make,
+    model: productData.model, mileage: productData.mileage, fuelType: productData.fuelType,
+    fuelConsumption: productData.fuelConsumption, currency: productData.currency || 'CHF',
+    ownershipDuration: carOwnershipDuration, annualMileage, depreciationCost: totalDepreciation,
+    annualDepreciation, estimatedResaleValue, fuelCostNPV: totalFuelCost, annualFuelCost,
+    insuranceCostNPV: totalInsuranceCost, annualInsuranceCost: carInsuranceAnnual,
+    taxCostNPV: totalTaxCost, annualTaxCost: carTaxAnnual, maintenanceCostNPV: totalMaintenanceCost,
+    annualMaintenanceCost, totalRunningCostsNPV, totalLifetimeCost: totalNetOwnershipCost, monthlyCost
+  };
+}

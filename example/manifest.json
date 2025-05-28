@@ -41,7 +41,15 @@
         "https://www.digitec.ch/de/*/product/*", 
         "https://digitec.ch/de/*/product/*"
       ],
-      "js": ["content.js"],
+      "js": [
+        "utils.js",
+        "page_detector.js",
+        "data_extractor.js",
+        "lifetime_calculator.js",
+        "results_ui.js",
+        "digitec_scraper.js",
+        "content.js"
+      ],
       "css": ["content.css"],
       "run_at": "document_idle"
     }

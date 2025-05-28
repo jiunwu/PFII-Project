@@ -363,3 +363,168 @@ function determineProductType() {
 if (typeof module !== 'undefined') {
   module.exports = ResultsUI;
 }
+
+// Format currency based on locale and currency code
+function formatCurrency(amount, currency = 'CHF') {
+  return new Intl.NumberFormat('de-CH', { style: 'currency', currency: currency }).format(amount);
+}
+
+// Display lifetime cost information on the page
+function displayLifetimeCost(productData, calculationResults) {
+  console.log('Displaying lifetime cost:', productData, calculationResults);
+  if (!productData || !calculationResults) {
+    console.warn('Missing productData or calculationResults for displayLifetimeCost');
+    return;
+  }
+
+  let container = document.getElementById('lifetime-cost-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'lifetime-cost-container';
+    // Attempt to insert before a common element, e.g., product description or reviews
+    const potentialInsertionPoints = [
+      document.querySelector('.product-description'),
+      document.querySelector('#description'),
+      document.querySelector('.product-details'),
+      document.querySelector('#product-details'),
+      document.querySelector('.product-info'),
+      document.querySelector('#reviews'),
+      document.querySelector('.pdp-content'), // Common on many sites
+      document.querySelector('#pdp-content'),
+      document.querySelector('.product-main-info'),
+      document.querySelector('.product-essential'),
+      document.querySelector('.product-view'),
+      document.querySelector('.product-shop'),
+      document.querySelector('.product-secondary-column'),
+      document.querySelector('.product-info-main'),
+      document.querySelector('.product-info-price'),
+      document.querySelector('.product-add-to-cart'),
+      document.querySelector('#add-to-cart-button'),
+      document.querySelector('form[data-productid]'),
+      document.querySelector('.product-detail-info__header'), // Zara
+      document.querySelector('.product-detail-info'), // Zara
+      document.querySelector('.product-detail-actions'), // Zara
+      document.querySelector('.product-detail-description'), // Zara
+      document.querySelector('[data-testid="product-title"]'), // Digitec
+      document.querySelector('.product-description-txt'), // Digitec
+      document.querySelector('.product-price-container'), // Digitec
+      document.querySelector('.article-info'), // Generic
+      document.querySelector('#productOverview') // Generic
+    ];
+
+    let inserted = false;
+    for (const point of potentialInsertionPoints) {
+      if (point && point.parentNode) {
+        point.parentNode.insertBefore(container, point);
+        inserted = true;
+        console.log('Lifetime cost container inserted before:', point);
+        break;
+      }
+    }
+    if (!inserted) {
+      // Fallback: append to body if no suitable point found
+      document.body.appendChild(container);
+      console.log('Lifetime cost container appended to body as fallback.');
+    }
+  }
+
+  const currency = productData.currency || 'CHF';
+  const purchasePrice = calculationResults.purchasePrice !== undefined ? calculationResults.purchasePrice : productData.price;
+  const totalLifetimeCost = calculationResults.totalLifetimeCost;
+
+  let htmlContent = `
+    <div class="ltc-card">
+      <h3 class="ltc-title">Lifetime Cost Analysis</h3>
+      <p class="ltc-item"><strong>Product:</strong> ${productData.name || 'N/A'}</p>
+      <p class="ltc-item"><strong>Purchase Price:</strong> ${formatCurrency(purchasePrice, currency)}</p>
+  `;
+
+  if (productData.productType === 'clothing') {
+    htmlContent += `
+      <p class="ltc-item"><strong>Estimated Lifespan:</strong> ${calculationResults.lifespan || 'N/A'} years</p>
+      <p class="ltc-item"><strong>Material:</strong> ${calculationResults.material || 'N/A'}</p>
+      <p class="ltc-item"><strong>Quality:</strong> ${calculationResults.quality || 'N/A'}</p>
+      <p class="ltc-item"><strong>Est. Maintenance (per year):</strong> ${formatCurrency(calculationResults.maintenanceCostPerYear || 0, currency)}</p>
+      <p class="ltc-item ltc-total-cost"><strong>Total Estimated Lifetime Cost:</strong> ${formatCurrency(totalLifetimeCost, currency)}</p>
+    `;
+  } else if (calculationResults.energyCostNPV !== undefined && calculationResults.maintenanceCostNPV !== undefined) {
+    htmlContent += `
+      <p class="ltc-item"><strong>Est. Lifespan:</strong> ${calculationResults.lifespan || 'N/A'} years</p>
+      <p class="ltc-item"><strong>Energy Efficiency:</strong> ${calculationResults.energyEfficiencyClass || 'N/A'}</p>
+      <p class="ltc-item"><strong>Est. Energy Cost (NPV):</strong> ${formatCurrency(calculationResults.energyCostNPV, currency)}</p>
+      <p class="ltc-item"><strong>Est. Maintenance Cost (NPV):</strong> ${formatCurrency(calculationResults.maintenanceCostNPV, currency)}</p>
+      <p class="ltc-item ltc-total-cost"><strong>Total Estimated Lifetime Cost:</strong> ${formatCurrency(totalLifetimeCost, currency)}</p>
+    `;
+  } else {
+    // Fallback for items where only price is known or calculation is minimal
+    htmlContent += `
+      <p class="ltc-item ltc-total-cost"><strong>Total Estimated Cost (Purchase Price):</strong> ${formatCurrency(totalLifetimeCost, currency)}</p>
+      <p class="ltc-item"><em>Detailed lifetime cost analysis not available for this product type or data.</em></p>
+    `;
+  }
+
+  htmlContent += `</div>`;
+  container.innerHTML = htmlContent;
+}
+
+// Display car lifetime cost information on the page
+function displayCarLifetimeCost(productData, calculationResults) {
+  console.log('Displaying car lifetime cost:', productData, calculationResults);
+  if (!productData || !calculationResults) {
+    console.warn('Missing productData or calculationResults for displayCarLifetimeCost');
+    return;
+  }
+
+  let container = document.getElementById('lifetime-cost-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'lifetime-cost-container';
+    // Attempt to insert in a relevant place for car listings
+    const potentialInsertionPoints = [
+      document.querySelector('.vehicle-details'),
+      document.querySelector('.cardetails'),
+      document.querySelector('.price-container'),
+      document.querySelector('.gallery-column'), // tutti.ch
+      document.querySelector('.panel-body'), // tutti.ch
+      document.querySelector('.vdp-pricing-panel'),
+      document.querySelector('#vdp-right-rail'),
+      document.querySelector('.overview-section'),
+      document.querySelector('.product-info-main') // Fallback if others not found
+    ];
+    let inserted = false;
+    for (const point of potentialInsertionPoints) {
+      if (point && point.parentNode) {
+        point.parentNode.insertBefore(container, point.nextSibling); // Insert after the element
+        inserted = true;
+        console.log('Car lifetime cost container inserted after:', point);
+        break;
+      }
+    }
+    if (!inserted) {
+      document.body.appendChild(container);
+      console.log('Car lifetime cost container appended to body as fallback.');
+    }
+  }
+
+  const currency = calculationResults.currency || 'CHF';
+
+  container.innerHTML = `
+    <div class="ltc-card ltc-car-card">
+      <h3 class="ltc-title">Car Lifetime Cost Analysis (Est. ${calculationResults.ownershipDuration} Years)</h3>
+      <p class="ltc-item"><strong>Vehicle:</strong> ${productData.make || ''} ${productData.model || ''} (${productData.year || 'N/A'})</p>
+      <p class="ltc-item"><strong>Purchase Price:</strong> ${formatCurrency(calculationResults.purchasePrice, currency)}</p>
+      <p class="ltc-item"><strong>Est. Annual Depreciation:</strong> ${formatCurrency(calculationResults.annualDepreciation, currency)}</p>
+      <p class="ltc-item"><strong>Est. Resale Value (after ${calculationResults.ownershipDuration} yrs):</strong> ${formatCurrency(calculationResults.estimatedResaleValue, currency)}</p>
+      <hr class="ltc-hr">
+      <p class="ltc-item"><strong>Est. Annual Fuel Cost:</strong> ${formatCurrency(calculationResults.annualFuelCost, currency)} (Fuel: ${productData.fuelType || 'N/A'}, ${productData.fuelConsumption || 'N/A'} L or kWh/100km)</p>
+      <p class="ltc-item"><strong>Est. Annual Insurance:</strong> ${formatCurrency(calculationResults.annualInsuranceCost, currency)}</p>
+      <p class="ltc-item"><strong>Est. Annual Tax:</strong> ${formatCurrency(calculationResults.annualTaxCost, currency)}</p>
+      <p class="ltc-item"><strong>Est. Annual Maintenance:</strong> ${formatCurrency(calculationResults.annualMaintenanceCost, currency)}</p>
+      <hr class="ltc-hr">
+      <p class="ltc-item"><strong>Total Depreciation (NPV over ${calculationResults.ownershipDuration} yrs):</strong> ${formatCurrency(calculationResults.depreciationCost, currency)}</p>
+      <p class="ltc-item"><strong>Total Running Costs (NPV over ${calculationResults.ownershipDuration} yrs):</strong> ${formatCurrency(calculationResults.totalRunningCostsNPV, currency)}</p>
+      <p class="ltc-item ltc-total-cost"><strong>Total Estimated Net Ownership Cost (NPV):</strong> ${formatCurrency(calculationResults.totalLifetimeCost, currency)}</p>
+      <p class="ltc-item ltc-monthly-cost"><strong>Estimated Monthly Cost:</strong> ${formatCurrency(calculationResults.monthlyCost, currency)}</p>
+    </div>
+  `;
+}

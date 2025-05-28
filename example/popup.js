@@ -262,13 +262,9 @@ function displayProductData(productData, calculationResults) {
     `;
   }
   
-  // Add buttons and settings section
+  // Add details button (Settings button is now static in popup.html)
   html += `
     <button id="details-button" class="details-button">View Details</button>
-    
-    <div class="settings-section">           
-      <button id="settings-button" class="settings-button">Open Settings</button>
-    </div>
   `;
   
   contentElement.innerHTML = html;
@@ -280,15 +276,12 @@ function displayProductData(productData, calculationResults) {
 function displayNoProductMessage() {
   const contentElement = document.getElementById('content');
   
+  // Settings button is now static in popup.html
   contentElement.innerHTML = `
     <div class="no-product">
       <div class="no-product-icon">🔍</div>
       <p>No product detected on this page.</p>
       <p>Navigate to a product page on saturn.de or a car listing on tutti.ch to see lifetime cost calculations.</p>
-    </div>
-    
-    <div class="settings-section"> 
-      <button id="settings-button" class="settings-button">Open Settings</button>
     </div>
   `;
 }

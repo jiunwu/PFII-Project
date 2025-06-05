@@ -40,34 +40,6 @@ async function initLifetimeCostCalculator() {
   }
 }
 
-// Check if the current page is a product page
-async function isProductPage() {
-  // Check URL pattern
-  if (!window.location.href.includes('/product/')) {
-    console.log('Not a product page based on URL');
-    return false;
-  }
-
-  // Use Gemini API to extract product data
-  const pageText = document.body.innerText;
-  const productData = await callGeminiAPIForProductData(pageText);
-  if (!productData) {
-    console.log('Gemini API did not return product data');
-    return false;
-  }
-  const productTitleElement = productData.name;
-  const priceElement = productData.price;
-  console.log('Product title element (Gemini):', productTitleElement);
-  console.log('Price element (Gemini):', priceElement);
-  if (!productTitleElement || !priceElement) {
-    console.log('Product title or price element not found in Gemini API result');
-    return false;
-  }
-  // Store productData for later use
-  window._ltcGeminiProductData = productData;
-  return true;
-}
-
 // Helper to call Gemini API for product data extraction
 async function callGeminiAPIForProductData(pageText) {
   return new Promise((resolve, reject) => {
@@ -273,6 +245,7 @@ function displayLifetimeCost(productData, calculationResults) {
       </div>
       
       <button class="ltc-details-button">Show Calculation Details</button>
+      <button class="ltc-save-button">Save This Product</button>
     </div>
   `;
   
@@ -295,6 +268,29 @@ function displayLifetimeCost(productData, calculationResults) {
   const detailsButton = container.querySelector('.ltc-details-button');
   detailsButton.addEventListener('click', () => {
     showCalculationDetails(productData, calculationResults);
+  });
+
+  // Add event listener for the save button
+  const saveButton = container.querySelector('.ltc-save-button');
+  saveButton.addEventListener('click', () => {
+    saveProduct(productData, calculationResults);
+  });
+}
+
+// Save product to Chrome storage
+function saveProduct(productData, calculationResults) {
+  const productToSave = {
+    ...productData,
+    calculationResults,
+    savedAt: new Date().toISOString(),
+    url: window.location.href
+  };
+  chrome.storage.sync.get({ savedProducts: [] }, (result) => {
+    const savedProducts = result.savedProducts;
+    savedProducts.push(productToSave);
+    chrome.storage.sync.set({ savedProducts }, () => {
+      alert('Product saved!');
+    });
   });
 }
 

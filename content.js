@@ -202,68 +202,30 @@ function calculateLifetimeCost(productData, preferences) {
 
 // Display lifetime cost on the page
 function displayLifetimeCost(productData, calculationResults) {
-  // Create container for our display
-  const container = document.createElement('div');
-  container.id = 'lifetime-cost-calculator';
-  container.className = 'ltc-container';
-  
-  // Format currency values
-  const formatCurrency = (value) => {
-    if (typeof value !== 'number' || isNaN(value)) {
-      console.error('Invalid value passed to formatCurrency:', value);
-      return '€0,00'; // Default fallback
-    }
-    return '€' + value.toFixed(2).replace('.', ',');
-  };
-  
-  // Create content
-  container.innerHTML = `
-    <div class="ltc-header">LIFETIME COST CALCULATOR</div>
-    <div class="ltc-content">
-      <div class="ltc-total">
-        Total Cost of Ownership (${calculationResults.lifespan} years): 
-        <span class="ltc-highlight">${formatCurrency(calculationResults.totalLifetimeCost)}</span>
-      </div>
-      
-      <div class="ltc-breakdown">
-        <div class="ltc-breakdown-title">Breakdown:</div>
-        <div class="ltc-breakdown-item">
-          • Purchase Price: ${formatCurrency(calculationResults.purchasePrice)}
-        </div>
-        <div class="ltc-breakdown-item">
-          • Energy Cost (NPV): ${formatCurrency(calculationResults.energyCostNPV)}
-        </div>
-        <div class="ltc-breakdown-item">
-          • Maintenance (NPV): ${formatCurrency(calculationResults.maintenanceCostNPV)}
-        </div>
-      </div>
-      
-      <div class="ltc-energy-info">
-        Annual Energy Consumption: ${calculationResults.annualEnergyConsumption} kWh
-        <br>
-        Energy Efficiency Class: ${calculationResults.energyEfficiencyClass}
-      </div>
-      
-      <button class="ltc-details-button">Show Calculation Details</button>
-      <button class="ltc-save-button">Save This Product</button>
-    </div>
-  `;
-  
-  // Find a good place to insert our container
-  const targetElement = document.querySelector('.product-details, .product-info, .product-summary');
-  if (targetElement) {
-    targetElement.parentNode.insertBefore(container, targetElement.nextSibling);
-  } else {
-    // Fallback: insert after the first heading
-    const heading = document.querySelector('h1');
-    if (heading) {
-      heading.parentNode.insertBefore(container, heading.nextSibling);
-    } else {
-      // Last resort: append to body
-      document.body.appendChild(container);
-    }
+  // Use the shared UI from results_ui.js if available
+  if (typeof window.displayLifetimeCost === 'function' && window.displayLifetimeCost !== displayLifetimeCost) {
+    window.displayLifetimeCost(productData, calculationResults);
+    return;
   }
-  
+
+  // Fallback: legacy display (should not be used if results_ui.js is loaded)
+  const container = document.createElement('div');
+  container.id = 'lifetime-cost-container';
+  container.className = 'ltc-card';
+  container.innerHTML = `
+    <h3 class="ltc-title">Lifetime Cost Analysis</h3>
+    <p class="ltc-item"><strong>Product:</strong> ${productData.name || 'N/A'}</p>
+    <p class="ltc-item"><strong>Purchase Price:</strong> ${calculationResults.purchasePrice || productData.price}</p>
+    <p class="ltc-item"><strong>Est. Lifespan:</strong> ${calculationResults.lifespan || 'N/A'} years</p>
+    <p class="ltc-item"><strong>Energy Efficiency:</strong> ${calculationResults.energyEfficiencyClass || 'N/A'}</p>
+    <p class="ltc-item"><strong>Est. Energy Cost (NPV):</strong> ${calculationResults.energyCostNPV || 'N/A'}</p>
+    <p class="ltc-item"><strong>Est. Maintenance Cost (NPV):</strong> ${calculationResults.maintenanceCostNPV || 'N/A'}</p>
+    <p class="ltc-item ltc-total-cost"><strong>Total Estimated Lifetime Cost:</strong> ${calculationResults.totalLifetimeCost}</p>
+    <button class="ltc-details-button">Show Calculation Details</button>
+    <button class="ltc-save-button">Save This Product</button>
+  `;
+  document.body.appendChild(container);
+
   // Add event listener for the details button
   const detailsButton = container.querySelector('.ltc-details-button');
   detailsButton.addEventListener('click', () => {

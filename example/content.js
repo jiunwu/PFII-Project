@@ -50,15 +50,8 @@ async function initLifetimeCostCalculator() {
               }
 
               // Display results on the page
-              if (productData.productType === 'car') {
-                console.log('Displaying car lifetime cost...');
-                // displayCarLifetimeCost is now in results_ui.js
-                displayCarLifetimeCost(productData, calculationResults);
-              } else {
-                console.log('Displaying appliance lifetime cost...');
-                // displayLifetimeCost is now in results_ui.js
-                displayLifetimeCost(productData, calculationResults);
-              }
+              // Use only displayLifetimeCost for all product types
+              displayLifetimeCost(productData, calculationResults);
 
               // Notify background script that a product was detected
               chrome.runtime.sendMessage({ 
@@ -70,18 +63,14 @@ async function initLifetimeCostCalculator() {
             } else {
               // Handle missing preferences, perhaps by using default calculation or showing an error/prompt.
               console.warn('User preferences not available. Using default calculations or showing minimal info.');
-              if (productData.productType === 'car') {
-                const minimalCarResults = calculateCarLifetimeCost(productData, {}); // Use empty prefs for defaults
-                displayCarLifetimeCost(productData, minimalCarResults);
-              } else {
-                const fallbackResults = {
-                  totalLifetimeCost: productData.price,
-                  purchasePrice: productData.price,
-                  productType: productData.productType || 'clothing' // Ensure productType is available
-                };
-                // displayLifetimeCost is now in results_ui.js
-                displayLifetimeCost(productData, fallbackResults);
-              }
+              const fallbackResults = productData.productType === 'car'
+                ? calculateCarLifetimeCost(productData, {})
+                : {
+                    totalLifetimeCost: productData.price,
+                    purchasePrice: productData.price,
+                    productType: productData.productType || 'clothing'
+                  };
+              displayLifetimeCost(productData, fallbackResults);
             }
           });
         } else {

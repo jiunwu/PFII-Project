@@ -197,7 +197,7 @@ class ResultsUI {
     
     // Create content
     modal.innerHTML = `
-      <div class="ltc-modal-content">
+      <div class="ltc-modal-content" style="max-width:420px;min-width:320px;width:100%;box-sizing:border-box;padding:32px 28px 24px 28px;margin:0;">
         <span class="ltc-modal-close">&times;</span>
         <h2>Lifetime Cost Calculation Details</h2>
         
@@ -388,12 +388,27 @@ function displayLifetimeCost(productData, calculationResults) {
   modal.style.boxShadow = '0 4px 16px rgba(25, 118, 210, 0.12)';
   modal.style.maxWidth = '420px';
   modal.style.minWidth = '320px';
-  modal.style.cursor = 'move';
+  modal.style.width = '420px';
+  modal.style.boxSizing = 'border-box';
+  modal.style.background = '#fff';
+  modal.style.border = 'none';
+  modal.style.borderRadius = '12px';
+  modal.style.boxShadow = '0 4px 16px rgba(25, 118, 210, 0.12)';
+  modal.style.zIndex = '1000000';
+  modal.style.height = 'fit-content';
+  modal.style.maxHeight = '';
+  // Set modal height to match .ltc-modal-content exactly
+  const modalContent = modal.querySelector('.ltc-modal-content');
+  // Wait for DOM to render content, then set height
+  setTimeout(() => {
+    if (modalContent) {
+      modal.style.height = modalContent.offsetHeight + 'px';
+      modal.style.maxHeight = modalContent.offsetHeight + 'px';
+    }
+  }, 0);
 
   // Modal content
-  let html = `<div class=\"ltc-modal-content\">
-    <div class=\"ltc-header\" style=\"cursor:pointer;user-select:none;\">Lifetime Cost Calculator</div>
-    <div class=\"ltc-content\">`;
+  let html = `<div class=\"ltc-modal-content\" style=\"max-width:420px;min-width:320px;width:100%;box-sizing:border-box;padding:32px 28px 24px 28px;margin:0;\">\n    <div class=\"ltc-header\" style=\"cursor:pointer;user-select:none;\">Lifetime Cost Calculator</div>\n    <div class=\"ltc-content\">`;
 
   // Product summary
   html += `<div class=\"ltc-summary\">
@@ -509,11 +524,22 @@ function displayLifetimeCost(productData, calculationResults) {
 
   // Add event listeners
   const detailsButton = modal.querySelector('.ltc-details-button');
-  if (detailsButton) detailsButton.addEventListener('click', () => {
-    if (typeof showCalculationDetails === 'function') {
-      showCalculationDetails(productData, calculationResults);
-    }
-  });
+  if (detailsButton) {
+    detailsButton.addEventListener('click', (e) => {
+      e.stopPropagation(); // Prevent modal drag/fold
+      if (typeof showCalculationDetails === 'function') {
+        showCalculationDetails(productData, calculationResults);
+      } else if (typeof window.showCalculationDetails === 'function') {
+        window.showCalculationDetails(productData, calculationResults);
+      } else if (typeof ResultsUI === 'function' && ResultsUI.prototype.showDetailsModal) {
+        // fallback: use ResultsUI class if available
+        const ui = new ResultsUI();
+        ui.showDetailsModal(productData, calculationResults);
+      } else {
+        alert('Detailed calculation view is not available.');
+      }
+    });
+  }
   const saveButton = modal.querySelector('.ltc-save-button');
   if (saveButton) saveButton.addEventListener('click', () => {
     if (typeof saveProduct === 'function') {

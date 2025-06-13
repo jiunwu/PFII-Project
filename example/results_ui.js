@@ -379,7 +379,7 @@ function displayLifetimeCost(productData, calculationResults) {
   modal.id = 'lifetime-cost-modal';
   modal.className = 'ltc-modal ltc-movable';
   modal.style.position = 'fixed';
-  modal.style.top = '80px';
+  modal.style.top = '160px';
   modal.style.right = '40px';
   modal.style.zIndex = '1000000';
   modal.style.background = '#fff';

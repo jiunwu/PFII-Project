@@ -117,6 +117,37 @@ function showCalculationDetails(productData, calculationResults) {
     return '€' + value.toFixed(2).replace('.', ',');
   };
 
+  // Add offers section based on product type
+  let offersSection = '';
+  if (productData.productType === 'car' || productData.productType === 'Car') {
+    offersSection = `
+      <h3>Bank Financing Offers</h3>
+      <ul style="margin-bottom:16px;">
+        <li><strong>UBS DriveCar Loan:</strong> 4.5% APR, up to 60 months - <a href="#" target="_blank">Apply now</a></li>
+        <li><strong>Credit Suisse AutoCredit:</strong> 3.9% APR, up to 72 months - <a href="#" target="_blank">See details</a></li>
+      </ul>
+      <h3>Insurance Offers</h3>
+      <ul>
+        <li><strong>AXA SmartCar Insurance:</strong> Full coverage from 39€/month - <a href="#" target="_blank">Get quote</a></li>
+        <li><strong>Zurich CarProtect:</strong> Liability + Theft from 32€/month - <a href="#" target="_blank">Get quote</a></li>
+      </ul>
+    `;
+  } else {
+    // Appliance offers
+    offersSection = `
+      <h3>Extended Warranty Options</h3>
+      <ul style="margin-bottom:16px;">
+        <li><strong>MediaMarkt Service+:</strong> 3-year extended warranty from €49 - <a href="#" target="_blank">Get quote</a></li>
+        <li><strong>Saturn Care:</strong> 5-year full protection from €89 - <a href="#" target="_blank">Learn more</a></li>
+      </ul>
+      <h3>Energy Efficiency Services</h3>
+      <ul>
+        <li><strong>EWZ EcoCheck:</strong> Free energy audit & optimization tips - <a href="#" target="_blank">Book now</a></li>
+        <li><strong>Green Energy Tariff:</strong> 100% renewable energy from €0.18/kWh - <a href="#" target="_blank">Switch now</a></li>
+      </ul>
+    `;
+  }
+
   // Create content with tabs: Calculation and Offers
   modal.innerHTML = `
     <div class="ltc-modal-content" style="max-width:420px;min-width:320px;width:100%;box-sizing:border-box;padding:0;margin:0;">
@@ -126,18 +157,26 @@ function showCalculationDetails(productData, calculationResults) {
         <div class="ltc-tab ltc-tab-offers" style="flex:1;text-align:center;padding:10px 0;cursor:pointer;font-weight:500;">Offers</div>
       </div>
       <div class="ltc-modal-body ltc-tab-calc-body" style="padding:20px 24px 18px 24px;">
-        <!-- Vehicle Information -->
+        <!-- Product Information -->
         <div class="ltc-section" style="margin-bottom:20px;display:grid;grid-template-columns:1fr 1fr;gap:8px;">
           <div style="grid-column:1/-1;"><strong>${productData.name || 'N/A'}</strong></div>
-          <p class="ltc-item" style="margin:0;"><strong>Make:</strong> ${calculationResults.make || 'N/A'}</p>
-          <p class="ltc-item" style="margin:0;"><strong>Model:</strong> ${calculationResults.model || 'N/A'}</p>
-          <p class="ltc-item" style="margin:0;"><strong>Year:</strong> ${calculationResults.year || 'N/A'}</p>
-          <p class="ltc-item" style="margin:0;"><strong>Mileage:</strong> ${calculationResults.mileage !== undefined ? calculationResults.mileage.toLocaleString() + ' km' : 'N/A'}</p>
-          <p class="ltc-item" style="margin:0;"><strong>Fuel:</strong> ${calculationResults.fuelType || 'N/A'}</p>
-          <p class="ltc-item" style="margin:0;"><strong>Consumption:</strong> ${calculationResults.fuelConsumption !== undefined ? calculationResults.fuelConsumption + ' l/100km' : 'N/A'}</p>
+          ${productData.productType === 'car' ? `
+            <p class="ltc-item" style="margin:0;"><strong>Make:</strong> ${calculationResults.make || 'N/A'}</p>
+            <p class="ltc-item" style="margin:0;"><strong>Model:</strong> ${calculationResults.model || 'N/A'}</p>
+            <p class="ltc-item" style="margin:0;"><strong>Year:</strong> ${calculationResults.year || 'N/A'}</p>
+            <p class="ltc-item" style="margin:0;"><strong>Mileage:</strong> ${calculationResults.mileage !== undefined ? calculationResults.mileage.toLocaleString() + ' km' : 'N/A'}</p>
+            <p class="ltc-item" style="margin:0;"><strong>Fuel:</strong> ${calculationResults.fuelType || 'N/A'}</p>
+            <p class="ltc-item" style="margin:0;"><strong>Consumption:</strong> ${calculationResults.fuelConsumption !== undefined ? calculationResults.fuelConsumption + ' l/100km' : 'N/A'}</p>
+          ` : `
+            <p class="ltc-item" style="margin:0;"><strong>Product Type:</strong> ${productData.productType ? productData.productType.charAt(0).toUpperCase() + productData.productType.slice(1) : 'Appliance'}</p>
+            <p class="ltc-item" style="margin:0;"><strong>Energy Class:</strong> ${calculationResults.energyEfficiencyClass || 'N/A'}</p>
+            <p class="ltc-item" style="margin:0;"><strong>Annual Energy:</strong> ${calculationResults.annualEnergyConsumption || 'N/A'} kWh</p>
+            <p class="ltc-item" style="margin:0;"><strong>Lifespan:</strong> ${calculationResults.lifespan || 'N/A'} years</p>
+          `}
         </div>
 
-        <!-- Purchase and Depreciation -->
+        ${productData.productType === 'car' ? `
+        <!-- Purchase and Depreciation (Cars only) -->
         <div class="ltc-section" style="margin-bottom:20px;padding:12px;background:#f5f7fa;border-radius:8px;">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
             <p class="ltc-item" style="margin:0;"><strong>Purchase Price:</strong><br/>${formatCurrency(calculationResults.purchasePrice)}</p>
@@ -148,7 +187,7 @@ function showCalculationDetails(productData, calculationResults) {
           </div>
         </div>
 
-        <!-- Annual Running Costs -->
+        <!-- Annual Running Costs (Cars only) -->
         <div class="ltc-section" style="margin-bottom:20px;padding:12px;background:#f8fafc;border-radius:8px;">
           <h4 style="margin:0 0 8px 0;font-size:1em;">Annual Running Costs</h4>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
@@ -159,7 +198,7 @@ function showCalculationDetails(productData, calculationResults) {
           </div>
         </div>
 
-        <!-- Total Cost Summary -->
+        <!-- Total Cost Summary (Cars) -->
         <div class="ltc-section" style="padding:12px;background:#f5f7fa;border-radius:8px;margin-bottom:16px;">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
             <p class="ltc-item" style="margin:0;"><strong>Total Running Costs:</strong><br/>${formatCurrency(calculationResults.totalRunningCostsNPV)}</p>
@@ -169,8 +208,28 @@ function showCalculationDetails(productData, calculationResults) {
             <p class="ltc-item ltc-total-cost" style="margin:0;font-size:1.1em;"><strong>Estimated Monthly Cost:</strong> ${formatCurrency(calculationResults.monthlyCost)}</p>
           </div>
         </div>
+        ` : `
+        <!-- Cost Breakdown (Appliances) -->
+        <div class="ltc-section" style="margin-bottom:20px;padding:12px;background:#f5f7fa;border-radius:8px;">
+          <h4 style="margin:0 0 8px 0;font-size:1em;">Cost Breakdown</h4>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <p class="ltc-item" style="margin:0;"><strong>Purchase Price:</strong><br/>${formatCurrency(calculationResults.purchasePrice)}</p>
+            <p class="ltc-item" style="margin:0;"><strong>Annual Energy Cost:</strong><br/>${formatCurrency(calculationResults.annualEnergyCost || 0)}</p>
+            <p class="ltc-item" style="margin:0;"><strong>Energy Cost (NPV):</strong><br/>${formatCurrency(calculationResults.energyCostNPV || 0)}</p>
+            <p class="ltc-item" style="margin:0;"><strong>Maintenance (NPV):</strong><br/>${formatCurrency(calculationResults.maintenanceCostNPV || 0)}</p>
+          </div>
+        </div>
 
-        <button class="ltc-save-button" style="width:100%;padding:8px;margin-top:8px;">Save This Product</button>
+        <!-- Total Cost Summary (Appliances) -->
+        <div class="ltc-section" style="padding:12px;background:#f8fafc;border-radius:8px;margin-bottom:16px;">
+          <div style="text-align:center;">
+            <p class="ltc-item ltc-total-cost" style="margin:0;font-size:1.2em;"><strong>Total Lifetime Cost:</strong><br/>${formatCurrency(calculationResults.totalLifetimeCost)}</p>
+            <p style="margin:8px 0 0 0;font-size:0.9em;color:#666;">over ${calculationResults.lifespan || 'N/A'} years</p>
+          </div>
+        </div>
+        `}
+
+        <button class="ltc-save-button" style="width:100%;padding:8px;margin-top:8px;">${productData.productType === 'car' ? 'Save This Car' : 'Save This Product'}</button>
       </div>
       <div class="ltc-modal-body ltc-tab-offers-body" style="display:none;padding:24px 24px 18px 24px;">
         <div class="ltc-offers-section" style="background:#f8fafc;padding:14px 16px 10px 16px;border-radius:8px;margin:0;">
@@ -253,7 +312,7 @@ function displayLifetimeCost(productData, calculationResults) {
   const modal = document.createElement('div');
   modal.className = 'ltc-modal';
   modal.style.position = 'fixed';
-  modal.style.top = '80px';
+  modal.style.top = '160px';
   modal.style.right = '40px';
   modal.style.maxWidth = '380px';
   modal.style.minWidth = '320px';
@@ -281,6 +340,20 @@ function displayLifetimeCost(productData, calculationResults) {
         <li><strong>Zurich CarProtect:</strong> Liability + Theft from 32€/month - <a href="#" target="_blank">Get quote</a></li>
       </ul>
     `;
+  } else {
+    // Appliance offers
+    offersSection = `
+      <h3>Extended Warranty Options</h3>
+      <ul style="margin-bottom:16px;">
+        <li><strong>MediaMarkt Service+:</strong> 3-year extended warranty from €49 - <a href="#" target="_blank">Get quote</a></li>
+        <li><strong>Saturn Care:</strong> 5-year full protection from €89 - <a href="#" target="_blank">Learn more</a></li>
+      </ul>
+      <h3>Energy Efficiency Services</h3>
+      <ul>
+        <li><strong>EWZ EcoCheck:</strong> Free energy audit & optimization tips - <a href="#" target="_blank">Book now</a></li>
+        <li><strong>Green Energy Tariff:</strong> 100% renewable energy from €0.18/kWh - <a href="#" target="_blank">Switch now</a></li>
+      </ul>
+    `;
   }
 
   // Create content with tabs
@@ -288,9 +361,11 @@ function displayLifetimeCost(productData, calculationResults) {
     <div class="ltc-modal-content" style="box-sizing:border-box;padding:0;margin:0;">
       <div class="ltc-modal-titlebar" style="cursor:pointer;font-weight:bold;font-size:1.1em;padding:12px 16px;user-select:none;background:#f5f7fa;border-radius:10px 10px 0 0;min-height:44px;display:flex;align-items:center;">
         <div style="flex:1;">Lifetime Cost Analysis</div>
-        <div class="ltc-monthly" style="font-size:0.9em;color:#666;">
-          <span style="font-weight:normal">Monthly:</span> ${formatCurrency(calculationResults.monthlyCost)}
-        </div>
+        ${calculationResults.monthlyCost ? `
+          <div class="ltc-monthly" style="font-size:0.9em;color:#666;">
+            <span style="font-weight:normal">Monthly:</span> ${formatCurrency(calculationResults.monthlyCost)}
+          </div>
+        ` : ''}
       </div>
       
       <div class="ltc-modal-tabs" style="display:flex;border-bottom:1px solid #e0e4ea;background:#f8fafc;">
@@ -299,12 +374,17 @@ function displayLifetimeCost(productData, calculationResults) {
       </div>
 
       <div class="ltc-modal-body ltc-tab-calc-body" style="padding:16px;">
-        <!-- Vehicle Info & Total Cost Summary -->
+        <!-- Product Info & Total Cost Summary -->
         <div class="ltc-section" style="margin-bottom:12px;padding:12px;background:#f5f7fa;border-radius:8px;">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
             <div style="grid-column:1/-1;font-size:1.1em;"><strong>${productData.name || 'N/A'}</strong></div>
-            <div class="ltc-item"><strong>Make/Model:</strong> ${(calculationResults.make || 'N/A')} ${(calculationResults.model || '')}</div>
-            <div class="ltc-item"><strong>Year/Mileage:</strong> ${calculationResults.year || 'N/A'} • ${calculationResults.mileage !== undefined ? calculationResults.mileage.toLocaleString() + ' km' : 'N/A'}</div>
+            ${productData.productType === 'car' ? `
+              <div class="ltc-item"><strong>Make/Model:</strong> ${(calculationResults.make || 'N/A')} ${(calculationResults.model || '')}</div>
+              <div class="ltc-item"><strong>Year/Mileage:</strong> ${calculationResults.year || 'N/A'} • ${calculationResults.mileage !== undefined ? calculationResults.mileage.toLocaleString() + ' km' : 'N/A'}</div>
+            ` : `
+              <div class="ltc-item"><strong>Product Type:</strong> ${productData.productType ? productData.productType.charAt(0).toUpperCase() + productData.productType.slice(1) : 'Appliance'}</div>
+              <div class="ltc-item"><strong>Energy Class:</strong> ${calculationResults.energyEfficiencyClass || 'N/A'}</div>
+            `}
           </div>
           <div style="font-size:1.2em;text-align:center;margin:8px 0;padding:8px;border-radius:4px;background:#e3f2fd;">
             <strong>Total Cost of Ownership:</strong><br/>
@@ -313,7 +393,8 @@ function displayLifetimeCost(productData, calculationResults) {
           </div>
         </div>
 
-        <!-- Tabbed Cost Sections -->
+        ${productData.productType === 'car' ? `
+        <!-- Tabbed Cost Sections (Cars only) -->
         <div class="ltc-section costs-tabs" style="margin-bottom:12px;background:white;border-radius:8px;overflow:hidden;">
           <div style="display:flex;background:#f5f7fa;border-bottom:1px solid #e0e4ea;">
             <div class="ltc-tab ltc-tab-purchase active" style="flex:1;text-align:center;padding:8px;cursor:pointer;font-weight:500;">Purchase</div>
@@ -362,14 +443,41 @@ function displayLifetimeCost(productData, calculationResults) {
             </div>
           </div>
         </div>
+        ` : `
+        <!-- Cost Breakdown for Appliances -->
+        <div class="ltc-section" style="margin-bottom:12px;padding:12px;background:white;border-radius:8px;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <div class="ltc-item">
+              <strong>Purchase Price:</strong><br/>
+              ${formatCurrency(calculationResults.purchasePrice)}
+            </div>
+            <div class="ltc-item">
+              <strong>Annual Energy Cost:</strong><br/>
+              ${formatCurrency(calculationResults.annualEnergyCost || 0)}
+            </div>
+            <div class="ltc-item">
+              <strong>Energy Cost (NPV):</strong><br/>
+              ${formatCurrency(calculationResults.energyCostNPV || 0)}
+            </div>
+            <div class="ltc-item">
+              <strong>Maintenance (NPV):</strong><br/>
+              ${formatCurrency(calculationResults.maintenanceCostNPV || 0)}
+            </div>
+          </div>
+        </div>
+        `}
 
-        <!-- Vehicle Info -->
+        <!-- Vehicle/Appliance specific info -->
         ${productData.productType === 'car' ? `
           <div style="font-size:0.9em;color:#666;margin-bottom:12px;text-align:center;">
             <strong>Fuel Type:</strong> ${calculationResults.fuelType || 'N/A'} • 
             <strong>Consumption:</strong> ${calculationResults.fuelConsumption !== undefined ? calculationResults.fuelConsumption + ' l/100km' : 'N/A'}
           </div>
-        ` : ''}
+        ` : `
+          <div style="font-size:0.9em;color:#666;margin-bottom:12px;text-align:center;">
+            <strong>Annual Energy Consumption:</strong> ${calculationResults.annualEnergyConsumption || 'N/A'} kWh
+          </div>
+        `}
 
         <!-- NPV Note -->
         <div style="font-size:0.85em;color:#666;text-align:center;margin-bottom:12px;">
@@ -378,7 +486,7 @@ function displayLifetimeCost(productData, calculationResults) {
         </div>
 
         <button class="ltc-save-button" style="width:100%;padding:8px;background:#1976d2;color:white;border:none;border-radius:4px;cursor:pointer;">
-          Save This Car
+          ${productData.productType === 'car' ? 'Save This Car' : 'Save This Product'}
         </button>
       </div>
 
@@ -411,25 +519,29 @@ function displayLifetimeCost(productData, calculationResults) {
     bodyCalc.style.display = 'none';
   });
 
-  // Cost section tabs (Purchase / Running Costs)
-  const tabPurchase = modal.querySelector('.ltc-tab-purchase');
-  const tabRunning = modal.querySelector('.ltc-tab-running');
-  const contentPurchase = modal.querySelector('.ltc-purchase-content');
-  const contentRunning = modal.querySelector('.ltc-running-content');
+  // Cost section tabs (Purchase / Running Costs) - only for cars
+  if (productData.productType === 'car') {
+    const tabPurchase = modal.querySelector('.ltc-tab-purchase');
+    const tabRunning = modal.querySelector('.ltc-tab-running');
+    const contentPurchase = modal.querySelector('.ltc-purchase-content');
+    const contentRunning = modal.querySelector('.ltc-running-content');
 
-  tabPurchase.addEventListener('click', () => {
-    tabPurchase.classList.add('active');
-    tabRunning.classList.remove('active');
-    contentPurchase.style.display = '';
-    contentRunning.style.display = 'none';
-  });
+    if (tabPurchase && tabRunning && contentPurchase && contentRunning) {
+      tabPurchase.addEventListener('click', () => {
+        tabPurchase.classList.add('active');
+        tabRunning.classList.remove('active');
+        contentPurchase.style.display = '';
+        contentRunning.style.display = 'none';
+      });
 
-  tabRunning.addEventListener('click', () => {
-    tabRunning.classList.add('active');
-    tabPurchase.classList.remove('active');
-    contentRunning.style.display = '';
-    contentPurchase.style.display = 'none';
-  });
+      tabRunning.addEventListener('click', () => {
+        tabRunning.classList.add('active');
+        tabPurchase.classList.remove('active');
+        contentRunning.style.display = '';
+        contentPurchase.style.display = 'none';
+      });
+    }
+  }
 
   // Make modal draggable (except titlebar folds/expands)
   let isDragging = false;

@@ -42,6 +42,7 @@ async function initializeDatabaseSchema() {
           total_maintenance_cost DECIMAL(10,2),
           total_lifetime_cost DECIMAL(10,2),
           calculation_results JSONB,
+          url TEXT,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
       `)
@@ -121,39 +122,70 @@ async function getItemById(id) {
 async function createItem(item) {
   if (isProduction && pool) {
     try {
+      console.log('Received item data:', item);
+
+      // Validate and sanitize the data
+      const sanitizedData = {
+        name: item.name || '',
+        description: item.description || '',
+        product_type: item.product_type || '',
+        price: parseFloat(item.price) || 0,
+        material: item.material || '',
+        quality: item.quality || '',
+        lifespan: parseInt(item.lifespan) || null,
+        annual_cost: parseFloat(item.annual_cost) || null,
+        maintenance_cost_per_year: parseFloat(item.maintenance_cost_per_year) || null,
+        total_maintenance_cost: parseFloat(item.total_maintenance_cost) || null,
+        total_lifetime_cost: parseFloat(item.total_lifetime_cost) || null,
+        calculation_results: typeof item.calculation_results === 'string' ? 
+          JSON.parse(item.calculation_results) : 
+          (item.calculation_results || {}),
+        url: item.url || ''
+      };
+
+      console.log('Sanitized data:', sanitizedData);
+
       // Convert camelCase to snake_case for database fields
       const result = await pool.query(
         `INSERT INTO saved_items(
           name, description, product_type, price, material, quality,
           lifespan, annual_cost, maintenance_cost_per_year,
-          total_maintenance_cost, total_lifetime_cost, calculation_results
-        ) VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
+          total_maintenance_cost, total_lifetime_cost, calculation_results,
+          url
+        ) VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
         [
-          item.name,
-          item.description,
-          item.productType || item.product_type, // Handle both camelCase and snake_case
-          item.price,
-          item.material,
-          item.quality,
-          item.lifespan,
-          item.annualCost || item.annual_cost,
-          item.maintenanceCostPerYear || item.maintenance_cost_per_year,
-          item.totalMaintenanceCost || item.total_maintenance_cost,
-          item.totalLifetimeCost || item.total_lifetime_cost,
-          JSON.stringify(item.calculationResults || item.calculation_results)
+          sanitizedData.name,
+          sanitizedData.description,
+          sanitizedData.product_type,
+          sanitizedData.price,
+          sanitizedData.material,
+          sanitizedData.quality,
+          sanitizedData.lifespan,
+          sanitizedData.annual_cost,
+          sanitizedData.maintenance_cost_per_year,
+          sanitizedData.total_maintenance_cost,
+          sanitizedData.total_lifetime_cost,
+          JSON.stringify(sanitizedData.calculation_results),
+          sanitizedData.url
         ]
-      )
-      return result.rows[0]
+      );
+
+      console.log('Database insert result:', result.rows[0]);
+      return result.rows[0];
     } catch (err) {
-      console.error('Database insert error:', err)
-      throw err
+      console.error('Database insert error:', err);
+      throw err;
     }
   } else {
     // For development, add to mock data
-    const newId = mockSavedItems.length > 0 ? Math.max(...mockSavedItems.map(item => item.id)) + 1 : 1
-    const newItem = { id: newId, ...item }
-    mockSavedItems.push(newItem)
-    return newItem
+    const newId = mockSavedItems.length > 0 ? Math.max(...mockSavedItems.map(item => item.id)) + 1 : 1;
+    const newItem = { 
+      id: newId, 
+      ...item,
+      createdAt: new Date()
+    };
+    mockSavedItems.push(newItem);
+    return newItem;
   }
 }
 
@@ -275,17 +307,14 @@ app.get('/api/items/:id', async (req, res) => {
 // POST create new item
 app.post('/api/items', async (req, res) => {
   try {
-    const { name, description } = req.body
+    console.log('Received POST request to /api/items');
+    console.log('Request body:', req.body);
     
-    if (!name || !description) {
-      return res.status(400).json({ error: 'Name and description are required' })
-    }
-    
-    const newItem = await createItem({ name, description })
-    res.status(201).json(newItem)
+    const newItem = await createItem(req.body);
+    res.json(newItem);
   } catch (err) {
-    console.error('Error creating item:', err)
-    res.status(500).json({ error: 'Failed to create item' })
+    console.error('Error creating item:', err);
+    res.status(500).json({ error: err.message });
   }
 })
 

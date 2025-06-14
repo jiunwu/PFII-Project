@@ -8,21 +8,67 @@ console.log('Document title:', document.title);
 // Save product to backend API
 async function saveProduct(productData, calculationResults) {
   try {
+    console.log('Original product data:', productData);
+    console.log('Original calculation results:', calculationResults);
+
+    // Extract data from calculation results
+    const calcData = calculationResults || {};
+    
     // Prepare the data for saving
     const saveData = {
       name: productData.name,
       description: `Product from ${productData.source || 'unknown source'}`,
-      product_type: productData.productType,
-      price: productData.price,
-      material: productData.material,
-      quality: calculationResults?.quality,
-      lifespan: calculationResults?.lifespan,
-      annual_cost: calculationResults?.annualCost,
-      maintenance_cost_per_year: calculationResults?.maintenanceCostPerYear,
-      total_maintenance_cost: calculationResults?.totalMaintenanceCost,
-      total_lifetime_cost: calculationResults?.totalLifetimeCost,
-      calculation_results: calculationResults
+      product_type: calcData.productType || productData.productType,
+      price: parseFloat(calcData.purchasePrice || productData.price) || 0,
+      material: productData.material || '',
+      quality: calcData.quality || '',
+      lifespan: parseInt(calcData.lifespan) || null,
+      annual_cost: parseFloat(calcData.annualCost) || null,
+      maintenance_cost_per_year: parseFloat(calcData.maintenanceCostPerYear) || null,
+      total_maintenance_cost: parseFloat(calcData.totalMaintenanceCost) || null,
+      total_lifetime_cost: parseFloat(calcData.totalLifetimeCost) || null,
+      calculation_results: {
+        productType: calcData.productType || '',
+        purchasePrice: parseFloat(calcData.purchasePrice) || 0,
+        make: calcData.make || '',
+        model: calcData.model || '',
+        year: parseInt(calcData.year) || null,
+        mileage: parseInt(calcData.mileage) || null,
+        fuelType: calcData.fuelType || '',
+        fuelConsumption: parseFloat(calcData.fuelConsumption) || null,
+        annualFuelCost: parseFloat(calcData.annualFuelCost) || null,
+        annualInsuranceCost: parseFloat(calcData.annualInsuranceCost) || null,
+        annualTaxCost: parseFloat(calcData.annualTaxCost) || null,
+        annualMaintenanceCost: parseFloat(calcData.annualMaintenanceCost) || null,
+        totalRunningCostsNPV: parseFloat(calcData.totalRunningCostsNPV) || null,
+        estimatedResaleValue: parseFloat(calcData.estimatedResaleValue) || null,
+        depreciationCost: parseFloat(calcData.depreciationCost) || null,
+        monthlyCost: parseFloat(calcData.monthlyCost) || null,
+        quality: calcData.quality || '',
+        lifespan: parseInt(calcData.lifespan) || null,
+        annualCost: parseFloat(calcData.annualCost) || null,
+        maintenanceCostPerYear: parseFloat(calcData.maintenanceCostPerYear) || null,
+        totalMaintenanceCost: parseFloat(calcData.totalMaintenanceCost) || null,
+        totalLifetimeCost: parseFloat(calcData.totalLifetimeCost) || null
+      },
+      url: window.location.href
     };
+
+    // Ensure all numeric values are properly formatted
+    Object.keys(saveData).forEach(key => {
+      if (typeof saveData[key] === 'number') {
+        saveData[key] = parseFloat(saveData[key].toFixed(2));
+      }
+    });
+
+    // Format calculation results numeric values
+    Object.keys(saveData.calculation_results).forEach(key => {
+      if (typeof saveData.calculation_results[key] === 'number') {
+        saveData.calculation_results[key] = parseFloat(saveData.calculation_results[key].toFixed(2));
+      }
+    });
+
+    console.log('Data being sent to server:', saveData);
 
     // Send the data to the backend
     const result = await fetch('https://xcost.tech/api/items', {
@@ -38,8 +84,12 @@ async function saveProduct(productData, calculationResults) {
 
     if (!result.ok) {
       const errorData = await result.json().catch(() => ({}));
+      console.error('Server response error:', errorData);
       throw new Error(errorData.message || `Failed to save product data: ${result.status} ${result.statusText}`);
     }
+
+    const responseData = await result.json();
+    console.log('Server response:', responseData);
 
     // Show success message
     const saveButton = document.querySelector('.ltc-save-button');

@@ -5,6 +5,84 @@ console.log('Lifetime Cost Calculator: Content script loaded');
 console.log('Current URL:', window.location.href);
 console.log('Document title:', document.title);
 
+// Save product to backend API
+async function saveProduct(productData, calculationResults) {
+  try {
+    // Prepare the data for saving
+    const saveData = {
+      name: productData.name,
+      description: `Product from ${productData.source || 'unknown source'}`,
+      product_type: productData.productType,
+      price: productData.price,
+      material: productData.material,
+      quality: calculationResults?.quality,
+      lifespan: calculationResults?.lifespan,
+      annual_cost: calculationResults?.annualCost,
+      maintenance_cost_per_year: calculationResults?.maintenanceCostPerYear,
+      total_maintenance_cost: calculationResults?.totalMaintenanceCost,
+      total_lifetime_cost: calculationResults?.totalLifetimeCost,
+      calculation_results: calculationResults
+    };
+
+    // Send the data to the backend
+    const result = await fetch('https://xcost.tech/api/items', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      mode: 'cors',
+      credentials: 'include',
+      body: JSON.stringify(saveData)
+    });
+
+    if (!result.ok) {
+      const errorData = await result.json().catch(() => ({}));
+      throw new Error(errorData.message || `Failed to save product data: ${result.status} ${result.statusText}`);
+    }
+
+    // Show success message
+    const saveButton = document.querySelector('.ltc-save-button');
+    if (saveButton) {
+      const originalText = saveButton.textContent;
+      saveButton.textContent = 'Saved!';
+      saveButton.disabled = true;
+      setTimeout(() => {
+        saveButton.textContent = originalText;
+        saveButton.disabled = false;
+      }, 2000);
+    }
+
+    // Also save to Chrome storage for backup
+    const productToSave = {
+      ...productData,
+      calculationResults,
+      savedAt: new Date().toISOString(),
+      url: window.location.href
+    };
+    chrome.storage.sync.get({ savedProducts: [] }, (result) => {
+      const savedProducts = result.savedProducts;
+      savedProducts.push(productToSave);
+      chrome.storage.sync.set({ savedProducts });
+    });
+  } catch (error) {
+    console.error('Error saving product data:', error);
+    // Show error message
+    const saveButton = document.querySelector('.ltc-save-button');
+    if (saveButton) {
+      const originalText = saveButton.textContent;
+      saveButton.textContent = error.message.includes('CORS') ? 
+        'Network error - please try again' : 
+        'Error saving!';
+      saveButton.disabled = true;
+      setTimeout(() => {
+        saveButton.textContent = originalText;
+        saveButton.disabled = false;
+      }, 2000);
+    }
+  }
+}
+
 // Ensure the content script is initialized (robust for all page states)
 if (document.readyState === 'complete' || document.readyState === 'interactive') {
   initLifetimeCostCalculator();
@@ -293,11 +371,17 @@ function showCalculationDetails(productData, calculationResults) {
     }
   });
 
-  // Add event listener for the save button
+  // Save button handler
   const saveButton = modal.querySelector('.ltc-save-button');
-  saveButton.addEventListener('click', () => {
-    saveProduct(productData, calculationResults);
-  });
+  if (saveButton) {
+    saveButton.addEventListener('click', async () => {
+      try {
+        await saveProduct(productData, calculationResults);
+      } catch (error) {
+        console.error('Error in save button handler:', error);
+      }
+    });
+  }
 }
 
 function displayLifetimeCost(productData, calculationResults) {
@@ -594,9 +678,15 @@ function displayLifetimeCost(productData, calculationResults) {
 
   // Save button handler
   const saveButton = modal.querySelector('.ltc-save-button');
-  saveButton.addEventListener('click', () => {
-    saveProduct(productData, calculationResults);
-  });
+  if (saveButton) {
+    saveButton.addEventListener('click', async () => {
+      try {
+        await saveProduct(productData, calculationResults);
+      } catch (error) {
+        console.error('Error in save button handler:', error);
+      }
+    });
+  }
 }
 
 // All other functions (isProductPage, callGeminiAPIForProductData, extractProductData, parsePrice, 

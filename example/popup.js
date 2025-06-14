@@ -9,6 +9,12 @@ document.addEventListener('DOMContentLoaded', function () {
     renderLifetimeCostCalculator(productData, calculationResults);
     updateStatusIndicator(productData != null);
 
+    // Show/hide save button based on product data availability
+    const saveButton = document.getElementById('save-button');
+    if (saveButton) {
+      saveButton.style.display = productData ? 'block' : 'none';
+    }
+
     const errorElement = document.getElementById('ltc-error-message');
     if (errorElement) {
       if (productData) {
@@ -28,7 +34,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
   });
   
-  // Add event listener for settings and details buttons
+  // Add event listener for settings, details, and save buttons
   document.addEventListener('click', function(event) {
     if (event.target.id === 'settings-button') {
       chrome.runtime.openOptionsPage();
@@ -41,6 +47,10 @@ document.addEventListener('DOMContentLoaded', function () {
           chrome.tabs.sendMessage(tabs[0].id, {type: 'SHOW_DETAILS'});
         }
       });
+    }
+
+    if (event.target.id === 'save-button') {
+      saveProductData();
     }
   });
 });
@@ -348,4 +358,74 @@ function displayProductInfo(productData, calculationResults) {
   const breakdownDiv = document.getElementById('ltc-cost-breakdown');
   infoDiv.innerHTML = `<strong>Product:</strong> ${productData.name || 'N/A'}<br><strong>Price:</strong> €${productData.price || 'N/A'}`;
   breakdownDiv.innerHTML = `<pre>${JSON.stringify(calculationResults, null, 2)}</pre>`;
+}
+
+// Function to save product data to the backend
+async function saveProductData() {
+  try {
+    // Get the current product data and calculation results
+    const response = await new Promise((resolve) => {
+      chrome.runtime.sendMessage({ type: 'GET_LAST_PRODUCT' }, resolve);
+    });
+
+    if (!response || !response.productData) {
+      throw new Error('No product data available to save');
+    }
+
+    const { productData, calculationResults } = response;
+
+    // Prepare the data for saving
+    const saveData = {
+      name: productData.name,
+      description: `Product from ${productData.source || 'unknown source'}`,
+      productType: productData.productType,
+      price: productData.price,
+      material: productData.material,
+      quality: calculationResults?.quality,
+      lifespan: calculationResults?.lifespan,
+      annualCost: calculationResults?.annualCost,
+      maintenanceCostPerYear: calculationResults?.maintenanceCostPerYear,
+      totalMaintenanceCost: calculationResults?.totalMaintenanceCost,
+      totalLifetimeCost: calculationResults?.totalLifetimeCost,
+      calculationResults: calculationResults
+    };
+
+    // Send the data to the backend
+    const result = await fetch('http://localhost:5006/api/items', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(saveData)
+    });
+
+    if (!result.ok) {
+      throw new Error('Failed to save product data');
+    }
+
+    // Show success message
+    const saveButton = document.getElementById('save-button');
+    if (saveButton) {
+      const originalText = saveButton.textContent;
+      saveButton.textContent = 'Saved!';
+      saveButton.disabled = true;
+      setTimeout(() => {
+        saveButton.textContent = originalText;
+        saveButton.disabled = false;
+      }, 2000);
+    }
+  } catch (error) {
+    console.error('Error saving product data:', error);
+    // Show error message
+    const saveButton = document.getElementById('save-button');
+    if (saveButton) {
+      const originalText = saveButton.textContent;
+      saveButton.textContent = 'Error saving!';
+      saveButton.disabled = true;
+      setTimeout(() => {
+        saveButton.textContent = originalText;
+        saveButton.disabled = false;
+      }, 2000);
+    }
+  }
 }

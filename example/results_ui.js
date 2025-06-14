@@ -162,6 +162,13 @@ class ResultsUI {
         this.showDetailsModal(productData, calculationResults);
       });
     }
+
+    const saveButton = document.querySelector('.ltc-save-button');
+    if (saveButton) {
+      saveButton.addEventListener('click', () => {
+        this.saveProduct(productData, calculationResults);
+      });
+    }
     
     // Listen for messages from popup
     chrome.runtime.onMessage.addListener((message) => {
@@ -348,6 +355,82 @@ class ResultsUI {
     const existingModal = document.getElementById(this.modalId);
     if (existingModal) {
       existingModal.parentNode.removeChild(existingModal);
+    }
+  }
+
+  /**
+   * Save product data to the backend API
+   * @param {Object} productData - Product data
+   * @param {Object} calculationResults - Calculation results
+   */
+  async saveProduct(productData, calculationResults) {
+    try {
+      // Prepare the data for saving
+      const saveData = {
+        name: productData.name,
+        description: `Product from ${productData.source || 'unknown source'}`,
+        productType: productData.productType,
+        price: productData.price,
+        material: productData.material,
+        quality: calculationResults?.quality,
+        lifespan: calculationResults?.lifespan,
+        annualCost: calculationResults?.annualCost,
+        maintenanceCostPerYear: calculationResults?.maintenanceCostPerYear,
+        totalMaintenanceCost: calculationResults?.totalMaintenanceCost,
+        totalLifetimeCost: calculationResults?.totalLifetimeCost,
+        calculationResults: calculationResults
+      };
+
+      // Send the data to the backend
+      const result = await fetch('http://localhost:5006/api/items', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(saveData)
+      });
+
+      if (!result.ok) {
+        throw new Error('Failed to save product data');
+      }
+
+      // Show success message
+      const saveButton = document.querySelector('.ltc-save-button');
+      if (saveButton) {
+        const originalText = saveButton.textContent;
+        saveButton.textContent = 'Saved!';
+        saveButton.disabled = true;
+        setTimeout(() => {
+          saveButton.textContent = originalText;
+          saveButton.disabled = false;
+        }, 2000);
+      }
+
+      // Also save to Chrome storage for backup
+      const productToSave = {
+        ...productData,
+        calculationResults,
+        savedAt: new Date().toISOString(),
+        url: window.location.href
+      };
+      chrome.storage.sync.get({ savedProducts: [] }, (result) => {
+        const savedProducts = result.savedProducts;
+        savedProducts.push(productToSave);
+        chrome.storage.sync.set({ savedProducts });
+      });
+    } catch (error) {
+      console.error('Error saving product data:', error);
+      // Show error message
+      const saveButton = document.querySelector('.ltc-save-button');
+      if (saveButton) {
+        const originalText = saveButton.textContent;
+        saveButton.textContent = 'Error saving!';
+        saveButton.disabled = true;
+        setTimeout(() => {
+          saveButton.textContent = originalText;
+          saveButton.disabled = false;
+        }, 2000);
+      }
     }
   }
 }

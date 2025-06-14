@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>xCost - Your Saved Items</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Add Font Awesome for icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <style>
+    /* Base Styles */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: "Inter", sans-serif;
+      color: white;
+      background-color: black;
+      min-height: 100vh;
+      overflow-x: hidden;
+      display: flex;
+    }
+
+    /* Instagram-style Sidebar */
+    .sidebar {
+      width: 220px;
+      height: 100vh;
+      position: fixed;
+      left: 0;
+      top: 0;
+      background-color: #000;
+      border-right: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 20px 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sidebar-logo {
+      font-size: 24px;
+      font-weight: 700;
+      padding: 10px 20px 30px;
+      display: block;
+      text-decoration: none;
+      color: white;
+    }
+
+    .sidebar-nav {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      padding: 12px 20px;
+      color: white;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.3s ease;
+      border-radius: 8px;
+      margin: 0 8px 8px;
+    }
+
+    .nav-item:hover {
+      background-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .nav-item.active {
+      font-weight: 600;
+      background-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .nav-item i {
+      font-size: 20px;
+      margin-right: 12px;
+      width: 24px;
+      text-align: center;
+    }
+
+    .sidebar-footer {
+      margin-top: auto;
+      padding: 20px;
+    }
+
+    /* Main Content */
+    .main-content {
+      flex: 1;
+      margin-left: 220px;
+      width: calc(100% - 220px);
+    }
+
+    .container {
+      width: 100%;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .headline {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 24px;
+    }
+
+    .saved-items-list {
+      list-style: none;
+      padding: 0;
+    }
+
+    .saved-item {
+      font-size: 18px;
+      margin-bottom: 16px;
+      padding: 12px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .item-content {
+      flex: 1;
+    }
+
+    .item-actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn {
+      background-color: transparent;
+      border: none;
+      color: white;
+      cursor: pointer;
+      padding: 5px;
+      border-radius: 4px;
+    }
+
+    .btn:hover {
+      background-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .btn.edit {
+      color: #3498db;
+    }
+
+    .btn.delete {
+      color: #e74c3c;
+    }
+
+    /* Form styling */
+    .form-container {
+      margin-bottom: 24px;
+      background: rgba(255, 255, 255, 0.1);
+      padding: 20px;
+      border-radius: 8px;
+    }
+
+    .form-title {
+      font-size: 24px;
+      margin-bottom: 16px;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 500;
+    }
+
+    .form-control {
+      width: 100%;
+      padding: 10px;
+      background-color: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+      color: white;
+      font-family: inherit;
+    }
+
+    .form-control:focus {
+      outline: none;
+      border-color: rgba(255, 255, 255, 0.5);
+    }
+
+    .form-buttons {
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn-submit {
+      padding: 10px 20px;
+      background-color: #3498db;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+
+    .btn-cancel {
+      padding: 10px 20px;
+      background-color: transparent;
+      color: white;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+
+    .btn-submit:hover {
+      background-color: #2980b9;
+    }
+
+    .btn-cancel:hover {
+      background-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    /* Loading and error states */
+    .loading, .error {
+      text-align: center;
+      padding: 20px;
+    }
+
+    .loading i {
+      font-size: 24px;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .error {
+      color: #e74c3c;
+    }
+
+    /* Media Query for Mobile Responsiveness */
+    @media (max-width: 768px) {
+      .sidebar {
+        width: 70px;
+      }
+
+      .sidebar-logo {
+        font-size: 20px;
+        padding: 10px;
+        text-align: center;
+      }
+
+      .nav-item span {
+        display: none;
+      }
+
+      .nav-item i {
+        margin-right: 0;
+      }
+
+      .main-content {
+        margin-left: 70px;
+        width: calc(100% - 70px);
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Instagram-style Sidebar -->
+  <div class="sidebar">
+    <a href="/" class="sidebar-logo">xCost</a>
+    <nav class="sidebar-nav">
+      <a href="/" class="nav-item">
+        <i class="fas fa-home"></i>
+        <span>Home</span>
+      </a>
+      <a href="/search" class="nav-item">
+        <i class="fas fa-search"></i>
+        <span>Search</span>
+      </a>
+      <a href="/explore" class="nav-item">
+        <i class="fas fa-compass"></i>
+        <span>Explore</span>
+      </a>
+      <a href="/notifications" class="nav-item">
+        <i class="fas fa-heart"></i>
+        <span>Notifications</span>
+      </a>
+      <a href="/saved-items" class="nav-item active">
+        <i class="fas fa-bookmark"></i>
+        <span>Saved Items</span>
+      </a>
+      <a href="/profile" class="nav-item">
+        <i class="fas fa-user-circle"></i>
+        <span>Profile</span>
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <a href="/settings" class="nav-item">
+        <i class="fas fa-cog"></i>
+        <span>Settings</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="main-content">
+    <div class="container">
+      <h1 class="headline">Saved Products</h1>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <% savedItems.forEach(item => { %>
+          <div class="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300">
+            <div class="p-6">
+              <div class="flex justify-between items-start mb-4">
+                <h2 class="text-xl font-semibold text-gray-800"><%= item.name %></h2>
+                <span class="px-3 py-1 text-sm rounded-full <%= item.productType === 'car' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800' %>">
+                  <%= item.productType ? (item.productType.charAt(0).toUpperCase() + item.productType.slice(1)) : '' %>
+                </span>
+              </div>
+
+              <div class="space-y-3">
+                <div class="flex justify-between">
+                  <span class="text-gray-600">Price:</span>
+                  <span class="font-medium">€<%= (typeof item.price === 'number' ? item.price.toFixed(2) : (item.price ? item.price : 'N/A')) %></span>
+                </div>
+                
+                <% if (typeof item.lifespan !== 'undefined' && item.lifespan !== null) { %>
+                  <div class="flex justify-between">
+                    <span class="text-gray-600">Lifespan:</span>
+                    <span class="font-medium"><%= item.lifespan %> years</span>
+                  </div>
+                <% } %>
+
+                <% if (typeof item.annualCost === 'number') { %>
+                  <div class="flex justify-between">
+                    <span class="text-gray-600">Annual Cost:</span>
+                    <span class="font-medium">€<%= item.annualCost.toFixed(2) %></span>
+                  </div>
+                <% } %>
+
+                <% if (typeof item.totalLifetimeCost === 'number') { %>
+                  <div class="flex justify-between">
+                    <span class="text-gray-600">Total Lifetime Cost:</span>
+                    <span class="font-medium">€<%= item.totalLifetimeCost.toFixed(2) %></span>
+                  </div>
+                <% } %>
+
+                <% if (item.quality) { %>
+                  <div class="flex justify-between">
+                    <span class="text-gray-600">Quality:</span>
+                    <span class="font-medium"><%= item.quality %></span>
+                  </div>
+                <% } %>
+
+                <% if (item.material) { %>
+                  <div class="flex justify-between">
+                    <span class="text-gray-600">Material:</span>
+                    <span class="font-medium"><%= item.material %></span>
+                  </div>
+                <% } %>
+              </div>
+
+              <div class="mt-6 pt-4 border-t border-gray-200">
+                <div class="flex justify-between items-center">
+                  <span class="text-sm text-gray-500">
+                    Saved on <%= new Date(item.createdAt).toLocaleDateString() %>
+                  </span>
+                  <button 
+                    onclick="deleteItem('<%= item.id %>')"
+                    class="text-red-600 hover:text-red-800 text-sm font-medium"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        <% }); %>
+      </div>
+
+      <% if (savedItems.length === 0) { %>
+        <div class="text-center py-12">
+          <div class="text-gray-400 mb-4">
+            <svg class="mx-auto h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
+            </svg>
+          </div>
+          <h3 class="text-lg font-medium text-gray-900 mb-2">No saved items yet</h3>
+          <p class="text-gray-500">Start saving products to see them here</p>
+        </div>
+      <% } %>
+    </div>
+  </div>
+
+  <!-- Reference external JavaScript file -->
+  <script src="/saved-items.js"></script>
+</body>
+</html>

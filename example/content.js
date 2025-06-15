@@ -5,6 +5,34 @@ console.log('xCost: Content script loaded');
 console.log('Current URL:', window.location.href);
 console.log('Document title:', document.title);
 
+// Function to clean up existing modals
+function cleanupExistingModals() {
+  const existingModals = document.querySelectorAll('.ltc-modal');
+  existingModals.forEach(modal => {
+    console.log('Removing existing modal:', modal);
+    modal.remove();
+  });
+}
+
+// Clean up modals when page is about to unload
+window.addEventListener('beforeunload', cleanupExistingModals);
+
+// Clean up modals when the page URL changes (for SPA navigation)
+let currentURL = window.location.href;
+setInterval(() => {
+  if (window.location.href !== currentURL) {
+    console.log('URL changed from', currentURL, 'to', window.location.href);
+    currentURL = window.location.href;
+    cleanupExistingModals();
+  }
+}, 1000);
+
+// Also listen for popstate events (browser back/forward)
+window.addEventListener('popstate', () => {
+  console.log('Popstate event detected, cleaning up modals');
+  cleanupExistingModals();
+});
+
 // Save product to backend API
 async function saveProduct(productData, calculationResults) {
   try {
@@ -218,9 +246,8 @@ async function initLifetimeCostCalculator() {
 }
 
 function showCalculationDetails(productData, calculationResults) {
-  // Remove any existing details modal only (not the main modal)
-  const existingDetailsModal = document.querySelector('.ltc-modal.ltc-details-modal');
-  if (existingDetailsModal) existingDetailsModal.remove();
+  // Clean up any existing modals first
+  cleanupExistingModals();
 
   // Create modal for detailed information
   const modal = document.createElement('div');
@@ -293,8 +320,8 @@ function showCalculationDetails(productData, calculationResults) {
             <p class="ltc-item" style="margin:0;"><strong>Model:</strong> ${calculationResults.model || 'N/A'}</p>
             <p class="ltc-item" style="margin:0;"><strong>Year:</strong> ${calculationResults.year || 'N/A'}</p>
             <p class="ltc-item" style="margin:0;"><strong>Mileage:</strong> ${calculationResults.mileage !== undefined ? calculationResults.mileage.toLocaleString() + ' km' : 'N/A'}</p>
-            <p class="ltc-item" style="margin:0;"><strong>Fuel:</strong> ${calculationResults.fuelType || 'N/A'}</p>
-            <p class="ltc-item" style="margin:0;"><strong>Consumption:</strong> ${calculationResults.fuelConsumption !== undefined ? calculationResults.fuelConsumption + ' l/100km' : 'N/A'}</p>
+            <p class="ltc-item" style="margin:0;"><strong>Fuel:</strong> ${calculationResults.fuelType || productData.fuelType || 'N/A'}</p>
+            <p class="ltc-item" style="margin:0;"><strong>Consumption:</strong> ${calculationResults.fuelConsumption || productData.fuelConsumption || 'N/A'} l/100km</p>
           ` : `
             <p class="ltc-item" style="margin:0;"><strong>Product Type:</strong> ${productData.productType ? productData.productType.charAt(0).toUpperCase() + productData.productType.slice(1) : 'Appliance'}</p>
             <p class="ltc-item" style="margin:0;"><strong>Energy Class:</strong> ${calculationResults.energyEfficiencyClass || 'N/A'}</p>
@@ -330,7 +357,7 @@ function showCalculationDetails(productData, calculationResults) {
         <div class="ltc-section" style="padding:12px;background:#f5f7fa;border-radius:8px;margin-bottom:16px;">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
             <p class="ltc-item" style="margin:0;"><strong>Total Running Costs:</strong><br/>${formatCurrency(calculationResults.totalRunningCostsNPV)}</p>
-            <p class="ltc-item" style="margin:0;"><strong>Total xCost:</strong><br/>${formatCurrency(calculationResults.totalLifetimeCost)}</p>
+            <p class="ltc-item" style="margin:0;"><strong>Total Cost:</strong><br/>${formatCurrency(calculationResults.totalLifetimeCost)}</p>
           </div>
           <div style="margin-top:8px;padding-top:8px;border-top:1px solid #e0e4ea;text-align:center;">
             <p class="ltc-item ltc-total-cost" style="margin:0;font-size:1.1em;"><strong>Estimated Monthly Cost:</strong> ${formatCurrency(calculationResults.monthlyCost)}</p>
@@ -351,7 +378,7 @@ function showCalculationDetails(productData, calculationResults) {
         <!-- Total Cost Summary (Appliances) -->
         <div class="ltc-section" style="padding:12px;background:#f8fafc;border-radius:8px;margin-bottom:16px;">
           <div style="text-align:center;">
-            <p class="ltc-item ltc-total-cost" style="margin:0;font-size:1.2em;"><strong>Total xCost:</strong><br/>${formatCurrency(calculationResults.totalLifetimeCost)}</p>
+            <p class="ltc-item ltc-total-cost" style="margin:0;font-size:1.2em;"><strong>Total Cost:</strong><br/>${formatCurrency(calculationResults.totalLifetimeCost)}</p>
             <p style="margin:8px 0 0 0;font-size:0.9em;color:#666;">over ${calculationResults.lifespan || 'N/A'} years</p>
           </div>
         </div>
@@ -435,6 +462,9 @@ function showCalculationDetails(productData, calculationResults) {
 }
 
 function displayLifetimeCost(productData, calculationResults) {
+  // Clean up any existing modals first
+  cleanupExistingModals();
+
   // Use the shared UI from results_ui.js if available
   if (typeof window.displayLifetimeCost === 'function' && window.displayLifetimeCost !== displayLifetimeCost) {
     window.displayLifetimeCost(productData, calculationResults);
@@ -514,9 +544,10 @@ function displayLifetimeCost(productData, calculationResults) {
             `}
           </div>
           <div style="font-size:1.2em;text-align:center;margin:8px 0;padding:8px;border-radius:4px;background:#e3f2fd;">
-            <strong>Total xCost:</strong><br/>
+            <strong>Total Cost:</strong><br/>
             <span style="font-size:1.3em;color:#1976d2;">${formatCurrency(calculationResults.totalLifetimeCost)}</span><br/>
             <span style="font-size:0.9em;color:#666;">over ${calculationResults.ownershipDuration || calculationResults.lifespan || 'N/A'} years</span>
+            ${calculationResults.monthlyCost ? `<br/><span style="font-size:0.9em;color:#666;">Monthly: ${formatCurrency(calculationResults.monthlyCost)}</span>` : ''}
           </div>
         </div>
 
@@ -597,8 +628,8 @@ function displayLifetimeCost(productData, calculationResults) {
         <!-- Vehicle/Appliance specific info -->
         ${productData.productType === 'car' ? `
           <div style="font-size:0.9em;color:#666;margin-bottom:12px;text-align:center;">
-            <strong>Fuel Type:</strong> ${calculationResults.fuelType || 'N/A'} • 
-            <strong>Consumption:</strong> ${calculationResults.fuelConsumption !== undefined ? calculationResults.fuelConsumption + ' l/100km' : 'N/A'}
+            <strong>Fuel Type:</strong> ${calculationResults.fuelType || productData.fuelType || 'N/A'} • 
+            <strong>Consumption:</strong> ${calculationResults.fuelConsumption || productData.fuelConsumption || 'N/A'} l/100km
           </div>
         ` : `
           <div style="font-size:0.9em;color:#666;margin-bottom:12px;text-align:center;">

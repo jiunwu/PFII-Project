@@ -406,7 +406,17 @@ function calculateCarLifetimeCost(productData, preferences) {
   const totalDepreciation = purchasePrice - estimatedResaleValue;
   const annualDepreciation = totalDepreciation / carOwnershipDuration;
 
-  const consumption = parseFloat(fuelConsumption) || (fuelType === 'electric' ? 20 : 8);
+  // Fix fuelConsumption handling - ensure we get a valid number
+  let consumption;
+  if (fuelConsumption && !isNaN(parseFloat(fuelConsumption))) {
+    consumption = parseFloat(fuelConsumption);
+    console.log('Using fuelConsumption from productData:', consumption);
+  } else {
+    // Use defaults based on fuel type
+    consumption = fuelType === 'electric' ? 20 : (fuelType === 'diesel' ? 7 : 8);
+    console.log('Using default consumption for', fuelType, ':', consumption);
+  }
+  
   const fuelPrice = fuelPrices[fuelType?.toLowerCase()] || fuelPrices.petrol;
   const annualFuelCost = (annualMileage / 100) * consumption * fuelPrice;
   
@@ -436,13 +446,30 @@ function calculateCarLifetimeCost(productData, preferences) {
   const monthlyCost = totalNetOwnershipCost / (carOwnershipDuration * 12);
 
   return {
-    productType: 'car', purchasePrice, year: productData.year, make: productData.make,
-    model: productData.model, mileage: productData.mileage, fuelType: productData.fuelType,
-    fuelConsumption: productData.fuelConsumption, currency: productData.currency || 'CHF',
-    ownershipDuration: carOwnershipDuration, annualMileage, depreciationCost: totalDepreciation,
-    annualDepreciation, estimatedResaleValue, fuelCostNPV: totalFuelCost, annualFuelCost,
-    insuranceCostNPV: totalInsuranceCost, annualInsuranceCost: carInsuranceAnnual,
-    taxCostNPV: totalTaxCost, annualTaxCost: carTaxAnnual, maintenanceCostNPV: totalMaintenanceCost,
-    annualMaintenanceCost, totalRunningCostsNPV, totalLifetimeCost: totalNetOwnershipCost, monthlyCost
+    productType: 'car', 
+    purchasePrice, 
+    year: productData.year, 
+    make: productData.make,
+    model: productData.model, 
+    mileage: productData.mileage, 
+    fuelType: productData.fuelType,
+    fuelConsumption: consumption, // Use the processed consumption value
+    currency: productData.currency || 'CHF',
+    ownershipDuration: carOwnershipDuration, 
+    annualMileage, 
+    depreciationCost: totalDepreciation,
+    annualDepreciation, 
+    estimatedResaleValue, 
+    fuelCostNPV: totalFuelCost, 
+    annualFuelCost,
+    insuranceCostNPV: totalInsuranceCost, 
+    annualInsuranceCost: carInsuranceAnnual,
+    taxCostNPV: totalTaxCost, 
+    annualTaxCost: carTaxAnnual, 
+    maintenanceCostNPV: totalMaintenanceCost,
+    annualMaintenanceCost, 
+    totalRunningCostsNPV, 
+    totalLifetimeCost: totalNetOwnershipCost, 
+    monthlyCost
   };
 }

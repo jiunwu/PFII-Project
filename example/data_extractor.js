@@ -26,9 +26,10 @@ async function callGeminiAPIForProductData(pageText, isCar) { // Added isCar par
 - Currency (e.g., CHF, EUR)
 - Mileage (km, as a number)
 - Fuel type (e.g., Petrol, Diesel, Electric, Hybrid)
-- Fuel consumption (e.g., L/100km for petrol/diesel, kWh/100km for electric. Provide as a number. If range, take average or typical.)
+- Fuel consumption (VERY IMPORTANT: Look for consumption data like "6.5 L/100km", "7.2l/100km", "15.8 kWh/100km", etc. Extract only the number part. Common patterns: "X.X L/100km", "X.X l/100km", "XX kWh/100km", "Verbrauch: X.X L", "Consommation: X.X L". If you find it, return the number only.)
 - Transmission (e.g., Automatic, Manual)
 - Location/Canton (e.g., ZH, BE - for Switzerland, if mentioned)
+
 Return the result as a JSON object with keys: make, model, year, price, currency, mileage, fuelType, fuelConsumption, transmission, location.
 Ensure price, year, mileage, and fuelConsumption are numbers.
 
@@ -81,7 +82,7 @@ ${pageText}`;
         try {
           // Remove markdown code block markers if present
           let text = data.candidates[0].content.parts[0].text;
-          console.log('Gemini API raw text before replace:', text);
+          console.log('Gemini API raw text before processing:', text);
           
           // Refined markdown stripping
           if (text.startsWith("```json")) {
@@ -97,11 +98,12 @@ ${pageText}`;
           }
           text = text.trim(); // Trim whitespace
 
-          console.log('Gemini API raw text after replace and trim:', text);
+          console.log('Gemini API processed text:', text);
 
           let parsedData = null;
           try {
             parsedData = JSON.parse(text);
+            console.log('Gemini API parsed data:', parsedData);
           } catch (jsonParseError) {
             console.error('[LTC DEBUG] JSON.parse failed. Raw text was:', text);
             console.error('[LTC DEBUG] JSON.parse error:', jsonParseError);
@@ -112,6 +114,24 @@ ${pageText}`;
           if (isCar && parsedData) {
             parsedData.name = `${parsedData.make || ''} ${parsedData.model || ''}`.trim();
             parsedData.productType = 'car'; // Ensure productType is set
+            
+            // Debug log fuel consumption specifically
+            console.log('Car fuel consumption from Gemini:', parsedData.fuelConsumption, typeof parsedData.fuelConsumption);
+            
+            // Ensure fuelConsumption is a number if provided
+            if (parsedData.fuelConsumption !== undefined && parsedData.fuelConsumption !== null) {
+              const consumption = parseFloat(parsedData.fuelConsumption);
+              if (!isNaN(consumption)) {
+                parsedData.fuelConsumption = consumption;
+                console.log('Processed fuel consumption to number:', consumption);
+              } else {
+                console.warn('Could not convert fuel consumption to number:', parsedData.fuelConsumption);
+                parsedData.fuelConsumption = null;
+              }
+            } else {
+              console.warn('No fuel consumption data from Gemini');
+              parsedData.fuelConsumption = null;
+            }
           } else if (isZara && parsedData) {
             // For Zara products, standardize the data format
             // Store the original currency if provided

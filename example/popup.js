@@ -1,6 +1,19 @@
 // popup.js - Script for the extension popup UI
 
 document.addEventListener('DOMContentLoaded', function () {
+  // First check onboarding status and API key
+  chrome.runtime.sendMessage({ type: 'GET_ONBOARDING_STATUS' }, (response) => {
+    if (!response.hasOnboarded || !response.hasApiKey) {
+      displayOnboardingPrompt(response.hasApiKey);
+      return;
+    }
+    
+    // User is properly onboarded, show normal functionality
+    initializeNormalPopup();
+  });
+});
+
+function initializeNormalPopup() {
   // Request the latest product and calculation results from background.js
   chrome.runtime.sendMessage({ type: 'GET_LAST_PRODUCT' }, (response) => {
     const productData = response ? response.productData : null;
@@ -25,7 +38,91 @@ document.addEventListener('DOMContentLoaded', function () {
       chrome.runtime.openOptionsPage();
     }
   });
-});
+}
+
+function displayOnboardingPrompt(hasApiKey) {
+  const container = document.getElementById('ltc-result-container');
+  if (!container) return;
+
+  let html = `
+    <div style="text-align: center; padding: 20px;">
+      <img src="images/icon-128.png" alt="xCost" style="width: 64px; margin-bottom: 15px;" />
+      <h2 style="color: #667eea; margin-bottom: 15px; font-size: 1.5em;">Welcome to xCost!</h2>
+  `;
+
+  if (!hasApiKey) {
+    html += `
+      <p style="margin-bottom: 15px; color: #666; line-height: 1.4;">
+        To start analyzing product costs, you need to set up your free Gemini API key.
+      </p>
+      <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 15px; margin-bottom: 15px; text-align: left;">
+        <strong style="color: #856404;">🚀 Quick Setup:</strong>
+        <ol style="margin: 10px 0 0 20px; color: #856404;">
+          <li>Get a free API key from <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color: #667eea;">Google AI Studio</a></li>
+          <li>Come back and enter it in settings</li>
+          <li>Start analyzing products!</li>
+        </ol>
+      </div>
+      <button id="setup-api-key" class="btn-primary" style="background: #667eea; color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-size: 16px; margin: 5px;">
+        🔧 Complete Setup
+      </button>
+    `;
+  } else {
+    html += `
+      <p style="margin-bottom: 15px; color: #666; line-height: 1.4;">
+        Your API key is set up! Now navigate to product pages on supported sites to see xCost calculations.
+      </p>
+      <div style="background: #d4edda; border: 1px solid #c3e6cb; border-radius: 8px; padding: 15px; margin-bottom: 15px; text-align: left;">
+        <strong style="color: #155724;">✅ Supported Sites:</strong>
+        <ul style="margin: 10px 0 0 20px; color: #155724;">
+          <li><strong>Saturn.de</strong> - Electronics & appliances</li>
+          <li><strong>AutoScout24.ch</strong> - Cars & vehicles</li>
+          <li><strong>Zara.com</strong> - Clothing & fashion</li>
+        </ul>
+      </div>
+      <button id="finish-setup" class="btn-primary" style="background: #28a745; color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-size: 16px; margin: 5px;">
+        ✨ Start Using xCost
+      </button>
+    `;
+  }
+
+  html += `
+      <br>
+      <button id="open-settings" class="btn-secondary" style="background: #6c757d; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px; margin: 5px;">
+        ⚙️ Settings
+      </button>
+    </div>
+  `;
+
+  container.innerHTML = html;
+
+  // Add event listeners for onboarding buttons
+  const setupButton = document.getElementById('setup-api-key');
+  if (setupButton) {
+    setupButton.addEventListener('click', () => {
+      chrome.runtime.sendMessage({ type: 'OPEN_ONBOARDING' });
+      window.close(); // Close popup
+    });
+  }
+
+  const finishButton = document.getElementById('finish-setup');
+  if (finishButton) {
+    finishButton.addEventListener('click', () => {
+      chrome.storage.sync.set({ hasOnboarded: true }, () => {
+        // Reinitialize normal popup
+        initializeNormalPopup();
+      });
+    });
+  }
+
+  const settingsButton = document.getElementById('open-settings');
+  if (settingsButton) {
+    settingsButton.addEventListener('click', () => {
+      chrome.runtime.openOptionsPage();
+      window.close(); // Close popup
+    });
+  }
+}
 
 // Listen for messages from the content script and update popup state
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {

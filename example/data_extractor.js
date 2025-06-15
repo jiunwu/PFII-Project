@@ -1,6 +1,130 @@
 // data_extractor.js
 console.log('xCost: data_extractor.js loaded');
 
+// Show API key setup notification for first-time users
+function showApiKeySetupNotification() {
+  // Check if notification already exists
+  if (document.querySelector('.xcost-api-setup-notification')) {
+    return; // Don't show multiple notifications
+  }
+
+  const notification = document.createElement('div');
+  notification.className = 'xcost-api-setup-notification';
+  notification.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    z-index: 10000;
+    max-width: 400px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 14px;
+    line-height: 1.4;
+    animation: slideInFromRight 0.5s ease-out;
+  `;
+
+  notification.innerHTML = `
+    <div style="display: flex; align-items: flex-start; margin-bottom: 15px;">
+      <div style="font-size: 24px; margin-right: 12px;">🚀</div>
+      <div>
+        <div style="font-weight: bold; font-size: 16px; margin-bottom: 5px;">Welcome to xCost!</div>
+        <div style="opacity: 0.9;">To analyze this product, you need to set up your free Gemini API key.</div>
+      </div>
+    </div>
+    
+    <div style="background: rgba(255,255,255,0.1); border-radius: 8px; padding: 12px; margin-bottom: 15px;">
+      <div style="font-weight: 500; margin-bottom: 8px;">Quick Setup (takes 2 minutes):</div>
+      <div style="font-size: 13px; opacity: 0.9;">
+        1. Get a free API key from <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color: #ffd700; text-decoration: underline;">Google AI Studio</a><br>
+        2. Click the extension icon and complete setup<br>
+        3. Refresh this page to see xCost analysis!
+      </div>
+    </div>
+    
+    <div style="text-align: center;">
+      <button id="xcost-setup-btn" style="
+        background: rgba(255,255,255,0.2);
+        border: 1px solid rgba(255,255,255,0.3);
+        color: white;
+        padding: 8px 16px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 13px;
+        margin-right: 10px;
+        transition: all 0.2s;
+      ">✨ Complete Setup</button>
+      <button id="xcost-dismiss-btn" style="
+        background: transparent;
+        border: 1px solid rgba(255,255,255,0.3);
+        color: rgba(255,255,255,0.8);
+        padding: 8px 16px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 13px;
+        transition: all 0.2s;
+      ">Later</button>
+    </div>
+  `;
+
+  // Add CSS animation
+  const style = document.createElement('style');
+  style.textContent = `
+    @keyframes slideInFromRight {
+      from {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+    
+    .xcost-api-setup-notification button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+    
+    .xcost-api-setup-notification a:hover {
+      color: #fff !important;
+    }
+  `;
+  document.head.appendChild(style);
+
+  document.body.appendChild(notification);
+
+  // Add event listeners
+  document.getElementById('xcost-setup-btn').addEventListener('click', () => {
+    // Open the extension popup or onboarding
+    chrome.runtime.sendMessage({ type: 'OPEN_ONBOARDING' });
+    notification.remove();
+    style.remove();
+  });
+
+  document.getElementById('xcost-dismiss-btn').addEventListener('click', () => {
+    notification.style.animation = 'slideInFromRight 0.3s ease-in reverse';
+    setTimeout(() => {
+      notification.remove();
+      style.remove();
+    }, 300);
+  });
+
+  // Auto-dismiss after 10 seconds
+  setTimeout(() => {
+    if (notification.parentNode) {
+      notification.style.animation = 'slideInFromRight 0.3s ease-in reverse';
+      setTimeout(() => {
+        notification.remove();
+        style.remove();
+      }, 300);
+    }
+  }, 10000);
+}
+
 // Helper to call Gemini API for product data extraction
 async function callGeminiAPIForProductData(pageText, isCar) { // Added isCar parameter
   console.log('Calling Gemini API for product data extraction... isCar:', isCar);
@@ -9,6 +133,10 @@ async function callGeminiAPIForProductData(pageText, isCar) { // Added isCar par
       const apiKey = result.geminiApiKey;
       if (!apiKey) {
         console.error('[LTC DEBUG] Gemini API key not set.');
+        
+        // Show a helpful onboarding notification for first-time users
+        showApiKeySetupNotification();
+        
         resolve(null);
         return;
       }

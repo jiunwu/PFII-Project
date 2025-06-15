@@ -1,31 +1,113 @@
 // background.js - Service Worker for xCost Extension
 
 // Initialize default settings when the extension is installed
-chrome.runtime.onInstalled.addListener(() => {
-  // Set default preferences
-  chrome.storage.sync.get('preferences', (data) => {
-    if (!data.preferences) {
-      const defaultPreferences = {
-        electricityRate: 0.30, // €/kWh
-        discountRate: 0.02, // 2%
-        applianceLifespans: {
-          refrigerator: 10,
-          washingMachine: 8,
-          dishwasher: 9,
-          dryer: 8
-        },
-        // Car-specific settings
-        carOwnershipDuration: 5, // years
-        annualMileage: 15000, // km per year
-        gasolinePrice: 1.90, // CHF per liter
-        dieselPrice: 1.95, // CHF per liter
-        electricityRate: 0.25 // CHF per kWh for EVs
-      };
-      
-      chrome.storage.sync.set({ preferences: defaultPreferences });
+chrome.runtime.onInstalled.addListener((details) => {
+  console.log('xCost extension installed with reason:', details.reason);
+  
+  // Handle different installation scenarios
+  if (details.reason === 'install') {
+    // First-time installation
+    console.log('First-time installation detected');
+    
+    // Set default preferences
+    const defaultPreferences = {
+      electricityRate: 0.30, // €/kWh
+      discountRate: 0.02, // 2%
+      applianceLifespans: {
+        refrigerator: 10,
+        washingMachine: 8,
+        dishwasher: 9,
+        dryer: 8,
+        clothing: 5,
+        unknown: 10
+      },
+      maintenanceCosts: {
+        refrigerator: { averageRepairCost: 350, expectedRepairs: 2 },
+        washingMachine: { averageRepairCost: 250, expectedRepairs: 3 },
+        dishwasher: { averageRepairCost: 200, expectedRepairs: 2 },
+        dryer: { averageRepairCost: 220, expectedRepairs: 2 },
+        clothing: { averageRepairCost: 20, expectedRepairs: 0 },
+        unknown: { averageRepairCost: 300, expectedRepairs: 2 }
+      },
+      // Car-specific settings
+      carOwnershipDuration: 5, // years
+      annualMileage: 15000, // km per year
+      fuelPrices: {
+        petrol: 1.8,
+        diesel: 1.9,
+        electric: 0.25
+      },
+      carInsuranceAnnual: 1000,
+      carTaxAnnual: 300,
+      carMaintenancePerKm: 0.05
+    };
+    
+    // Initialize preferences and onboarding status
+    chrome.storage.sync.set({ 
+      preferences: defaultPreferences,
+      hasOnboarded: false 
+    }, () => {
       console.log('Default preferences initialized:', defaultPreferences);
-    }
-  });
+      
+      // Open onboarding page
+      chrome.tabs.create({ 
+        url: chrome.runtime.getURL('onboarding.html'),
+        active: true 
+      });
+    });
+    
+  } else if (details.reason === 'update') {
+    // Extension was updated
+    console.log('Extension updated from version:', details.previousVersion);
+    
+    // Check if user has already onboarded
+    chrome.storage.sync.get(['hasOnboarded', 'preferences'], (data) => {
+      if (!data.hasOnboarded) {
+        // User hasn't onboarded yet, show onboarding
+        chrome.tabs.create({ 
+          url: chrome.runtime.getURL('onboarding.html'),
+          active: true 
+        });
+      }
+      
+      // Update preferences with any new default values if needed
+      if (!data.preferences) {
+        const defaultPreferences = {
+          electricityRate: 0.30,
+          discountRate: 0.02,
+          applianceLifespans: {
+            refrigerator: 10,
+            washingMachine: 8,
+            dishwasher: 9,
+            dryer: 8,
+            clothing: 5,
+            unknown: 10
+          },
+          maintenanceCosts: {
+            refrigerator: { averageRepairCost: 350, expectedRepairs: 2 },
+            washingMachine: { averageRepairCost: 250, expectedRepairs: 3 },
+            dishwasher: { averageRepairCost: 200, expectedRepairs: 2 },
+            dryer: { averageRepairCost: 220, expectedRepairs: 2 },
+            clothing: { averageRepairCost: 20, expectedRepairs: 0 },
+            unknown: { averageRepairCost: 300, expectedRepairs: 2 }
+          },
+          carOwnershipDuration: 5,
+          annualMileage: 15000,
+          fuelPrices: {
+            petrol: 1.8,
+            diesel: 1.9,
+            electric: 0.25
+          },
+          carInsuranceAnnual: 1000,
+          carTaxAnnual: 300,
+          carMaintenancePerKm: 0.05
+        };
+        
+        chrome.storage.sync.set({ preferences: defaultPreferences });
+        console.log('Default preferences set after update');
+      }
+    });
+  }
 });
 
 let lastProductData = null;
@@ -39,6 +121,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ preferences: data.preferences });
     });
     return true; // Required for asynchronous response
+  }
+  
+  if (message.type === 'GET_ONBOARDING_STATUS') {
+    // Check if user has completed onboarding
+    chrome.storage.sync.get(['hasOnboarded', 'geminiApiKey'], (data) => {
+      sendResponse({ 
+        hasOnboarded: data.hasOnboarded,
+        hasApiKey: !!data.geminiApiKey
+      });
+    });
+    return true;
+  }
+  
+  if (message.type === 'OPEN_ONBOARDING') {
+    // Open onboarding page manually
+    chrome.tabs.create({ 
+      url: chrome.runtime.getURL('onboarding.html'),
+      active: true 
+    });
+    return;
   }
   
   if (message.type === 'PRODUCT_DETECTED') {

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Lifetime Cost Calculator",
-  "version": "1.0.0",
-  "description": "Calculate and display the lifetime costs of products including energy consumption and maintenance",
+  "name": "xCost",
+  "version": "1.0",
+  "description": "Calculate and compare the true lifetime costs of products including cars, appliances, and clothing.",
   "icons": {
     "16": "images/icon-16.png",
     "48": "images/icon-48.png",

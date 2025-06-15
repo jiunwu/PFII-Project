@@ -1,4 +1,4 @@
-// background.js - Service Worker for Lifetime Cost Calculator Extension
+// background.js - Service Worker for xCost Extension
 
 // Initialize default settings when the extension is installed
 chrome.runtime.onInstalled.addListener(() => {

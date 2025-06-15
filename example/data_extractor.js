@@ -1,5 +1,5 @@
 // data_extractor.js
-console.log('Lifetime Cost Calculator: data_extractor.js loaded');
+console.log('xCost: data_extractor.js loaded');
 
 // Helper to call Gemini API for product data extraction
 async function callGeminiAPIForProductData(pageText, isCar) { // Added isCar parameter

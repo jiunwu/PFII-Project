@@ -1,5 +1,5 @@
 // page_detector.js
-console.log('Lifetime Cost Calculator: page_detector.js loaded');
+console.log('xCost: page_detector.js loaded');
 
 // Check if the current page is a product page
 async function isProductPage() {

@@ -1,5 +1,5 @@
-// content.js - Content script for Lifetime Cost Calculator Extension
-console.log('Lifetime Cost Calculator: Content script loaded');
+// content.js - Content script for xCost Extension
+console.log('xCost: Content script loaded');
 
 // Debug: Log current URL and document title
 console.log('Current URL:', window.location.href);
@@ -143,7 +143,7 @@ if (document.readyState === 'complete' || document.readyState === 'interactive')
 // Main function to initialize the content script
 async function initLifetimeCostCalculator() {
   console.log('initLifetimeCostCalculator called');
-  console.log('Lifetime Cost Calculator: Content script initialized');
+  console.log('xCost: Content script initialized');
 
   try {
     // Check if we're on a product page using function from page_detector.js
@@ -279,7 +279,7 @@ function showCalculationDetails(productData, calculationResults) {
   // Create content with tabs: Calculation and Offers
   modal.innerHTML = `
     <div class="ltc-modal-content" style="max-width:420px;min-width:320px;width:100%;box-sizing:border-box;padding:0;margin:0;">
-      <div class="ltc-modal-titlebar" style="cursor:pointer;font-weight:bold;font-size:1.1em;padding:14px 24px 14px 24px;user-select:none;background:#f5f7fa;border-radius:10px 10px 0 0;min-height:48px;display:flex;align-items:center;">Lifetime Cost Analysis</div>
+      <div class="ltc-modal-titlebar" style="cursor:pointer;font-weight:bold;font-size:1.1em;padding:14px 24px 14px 24px;user-select:none;background:#f5f7fa;border-radius:10px 10px 0 0;min-height:48px;display:flex;align-items:center;">xCost Analysis</div>
       <div class="ltc-modal-tabs" style="display:flex;border-bottom:1px solid #e0e4ea;background:#f8fafc;">
         <div class="ltc-tab ltc-tab-calc active" style="flex:1;text-align:center;padding:10px 0;cursor:pointer;font-weight:500;">Calculation</div>
         <div class="ltc-tab ltc-tab-offers" style="flex:1;text-align:center;padding:10px 0;cursor:pointer;font-weight:500;">Offers</div>
@@ -330,7 +330,7 @@ function showCalculationDetails(productData, calculationResults) {
         <div class="ltc-section" style="padding:12px;background:#f5f7fa;border-radius:8px;margin-bottom:16px;">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
             <p class="ltc-item" style="margin:0;"><strong>Total Running Costs:</strong><br/>${formatCurrency(calculationResults.totalRunningCostsNPV)}</p>
-            <p class="ltc-item" style="margin:0;"><strong>Total Ownership:</strong><br/>${formatCurrency(calculationResults.totalLifetimeCost)}</p>
+            <p class="ltc-item" style="margin:0;"><strong>Total xCost:</strong><br/>${formatCurrency(calculationResults.totalLifetimeCost)}</p>
           </div>
           <div style="margin-top:8px;padding-top:8px;border-top:1px solid #e0e4ea;text-align:center;">
             <p class="ltc-item ltc-total-cost" style="margin:0;font-size:1.1em;"><strong>Estimated Monthly Cost:</strong> ${formatCurrency(calculationResults.monthlyCost)}</p>
@@ -351,7 +351,7 @@ function showCalculationDetails(productData, calculationResults) {
         <!-- Total Cost Summary (Appliances) -->
         <div class="ltc-section" style="padding:12px;background:#f8fafc;border-radius:8px;margin-bottom:16px;">
           <div style="text-align:center;">
-            <p class="ltc-item ltc-total-cost" style="margin:0;font-size:1.2em;"><strong>Total Lifetime Cost:</strong><br/>${formatCurrency(calculationResults.totalLifetimeCost)}</p>
+            <p class="ltc-item ltc-total-cost" style="margin:0;font-size:1.2em;"><strong>Total xCost:</strong><br/>${formatCurrency(calculationResults.totalLifetimeCost)}</p>
             <p style="margin:8px 0 0 0;font-size:0.9em;color:#666;">over ${calculationResults.lifespan || 'N/A'} years</p>
           </div>
         </div>
@@ -493,21 +493,14 @@ function displayLifetimeCost(productData, calculationResults) {
   // Create content with tabs
   modal.innerHTML = `
     <div class="ltc-modal-content" style="box-sizing:border-box;padding:0;margin:0;">
-      <div class="ltc-modal-titlebar" style="cursor:pointer;font-weight:bold;font-size:1.1em;padding:12px 16px;user-select:none;background:#f5f7fa;border-radius:10px 10px 0 0;min-height:44px;display:flex;align-items:center;">
-        <div style="flex:1;">Lifetime Cost Analysis</div>
-        ${calculationResults.monthlyCost ? `
-          <div class="ltc-monthly" style="font-size:0.9em;color:#666;">
-            <span style="font-weight:normal">Monthly:</span> ${formatCurrency(calculationResults.monthlyCost)}
-          </div>
-        ` : ''}
-      </div>
+      <div class="ltc-modal-titlebar" style="cursor:pointer;font-weight:bold;font-size:1.1em;padding:14px 24px 14px 24px;user-select:none;background:#f5f7fa;border-radius:10px 10px 0 0;min-height:48px;display:flex;align-items:center;">xCost Analysis</div>
       
       <div class="ltc-modal-tabs" style="display:flex;border-bottom:1px solid #e0e4ea;background:#f8fafc;">
-        <div class="ltc-tab ltc-tab-calc active" style="flex:1;text-align:center;padding:8px 0;cursor:pointer;font-weight:500;">Calculation</div>
-        <div class="ltc-tab ltc-tab-offers" style="flex:1;text-align:center;padding:8px 0;cursor:pointer;font-weight:500;">Offers</div>
+        <div class="ltc-tab ltc-tab-calc active" style="flex:1;text-align:center;padding:10px 0;cursor:pointer;font-weight:500;">Calculation</div>
+        <div class="ltc-tab ltc-tab-offers" style="flex:1;text-align:center;padding:10px 0;cursor:pointer;font-weight:500;">Offers</div>
       </div>
 
-      <div class="ltc-modal-body ltc-tab-calc-body" style="padding:16px;">
+      <div class="ltc-modal-body ltc-tab-calc-body" style="padding:20px 24px 18px 24px;">
         <!-- Product Info & Total Cost Summary -->
         <div class="ltc-section" style="margin-bottom:12px;padding:12px;background:#f5f7fa;border-radius:8px;">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
@@ -521,7 +514,7 @@ function displayLifetimeCost(productData, calculationResults) {
             `}
           </div>
           <div style="font-size:1.2em;text-align:center;margin:8px 0;padding:8px;border-radius:4px;background:#e3f2fd;">
-            <strong>Total Cost of Ownership:</strong><br/>
+            <strong>Total xCost:</strong><br/>
             <span style="font-size:1.3em;color:#1976d2;">${formatCurrency(calculationResults.totalLifetimeCost)}</span><br/>
             <span style="font-size:0.9em;color:#666;">over ${calculationResults.ownershipDuration || calculationResults.lifespan || 'N/A'} years</span>
           </div>

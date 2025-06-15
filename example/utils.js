@@ -1,5 +1,5 @@
 // utils.js
-console.log('Lifetime Cost Calculator: utils.js loaded');
+console.log('xCost: utils.js loaded');
 
 // Determine product type based on page content
 function determineProductType(pageText) { // Added pageText parameter

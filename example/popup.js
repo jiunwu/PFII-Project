@@ -6,25 +6,10 @@ document.addEventListener('DOMContentLoaded', function () {
     const productData = response ? response.productData : null;
     const calculationResults = response ? response.calculationResults : null;
 
-    renderLifetimeCostCalculator(productData, calculationResults);
+    console.log('Popup received data:', { productData, calculationResults });
+
+    displayProductInfo(productData, calculationResults);
     updateStatusIndicator(productData != null);
-
-    // Show/hide save button based on product data availability
-    const saveButton = document.getElementById('save-button');
-    if (saveButton) {
-      saveButton.style.display = productData ? 'block' : 'none';
-    }
-
-    const errorElement = document.getElementById('ltc-error-message');
-    if (errorElement) {
-      if (productData) {
-        errorElement.textContent = ''; // Clear error if data is present
-      } else {
-        // renderLifetimeCostCalculator should handle the main "no product" message.
-        // This could be a fallback or a more general status.
-        // errorElement.textContent = 'No product data. Navigate to a supported page and reopen popup.';
-      }
-    }
   });
 
   // Get user preferences for displaying settings
@@ -34,119 +19,187 @@ document.addEventListener('DOMContentLoaded', function () {
     }
   });
   
-  // Add event listener for settings, details, and save buttons
+  // Add event listener for settings button only
   document.addEventListener('click', function(event) {
     if (event.target.id === 'settings-button') {
       chrome.runtime.openOptionsPage();
-    }
-    
-    if (event.target.id === 'details-button') {
-      chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-        // Ensure tabs[0] and tabs[0].id exist before sending a message
-        if (tabs && tabs.length > 0 && tabs[0] && tabs[0].id) {
-          chrome.tabs.sendMessage(tabs[0].id, {type: 'SHOW_DETAILS'});
-        }
-      });
-    }
-
-    if (event.target.id === 'save-button') {
-      saveProductData();
     }
   });
 });
 
 // Listen for messages from the content script and update popup state
-// This listener helps if the popup is already open when a product is detected.
-// For the "refresh on reload" scenario, GET_LAST_PRODUCT on DOMContentLoaded is key.
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'PRODUCT_DETECTED') {
-    // Storing in localStorage here might be for a specific purpose,
-    // but primary rendering on open relies on GET_LAST_PRODUCT.
     localStorage.setItem('ltc_productData', JSON.stringify(message.productData));
     localStorage.setItem('ltc_calculationResults', JSON.stringify(message.calculationResults));
-    // Optionally, if the popup is open, re-render immediately:
-    // renderLifetimeCostCalculator(message.productData, message.calculationResults);
-    // updateStatusIndicator(message.productData != null);
   }
 });
 
-// Helper to render the product and calculation results in the popup
-function renderLifetimeCostCalculator(productData, calculationResults) {
+/**
+ * Display product information and calculation results in the popup
+ * @param {Object} productData - Product data
+ * @param {Object} calculationResults - Calculation results
+ */
+function displayProductInfo(productData, calculationResults) {
   const container = document.getElementById('ltc-result-container');
   if (!container) return;
-  container.innerHTML = '';
 
-  // Always log the data for debugging
-  console.log('Rendering with:', { productData, calculationResults });
+  console.log('Displaying product info:', { productData, calculationResults });
 
-  // Check if we have at least some product data
-  if (productData && productData.name) {
-    // Clothing-specific UI
-    if (calculationResults && calculationResults.productType === 'clothing') {
-      container.innerHTML = `
-        <div style="font-weight:700;font-size:1.1em;color:#0077b6;margin-bottom:8px;letter-spacing:1px;">Lifetime Cost Calculator</div>
-        <div style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
-          <b style="flex:1;">${productData.name}</b>
-          <span style="font-weight:600;margin-left:10px;">${formatCurrency(productData.price)}</span>
-        </div>
-        <div style="margin-bottom:8px;"><b>Material:</b> ${calculationResults.material || 'N/A'} (${calculationResults.quality || 'N/A'} quality)</div>
-        <div style="margin-bottom:8px;"><b>Estimated Lifespan:</b> ${calculationResults.lifespan} years</div>
-        <div style="margin-bottom:8px;"><b>Annualized Cost:</b> ${formatCurrency(calculationResults.annualCost)}</div>
-        <div style="margin-bottom:8px;"><b>Maintenance per Year:</b> ${formatCurrency(calculationResults.maintenanceCostPerYear)}</div>
-        <div style="margin-bottom:8px;"><b>Total Maintenance:</b> ${formatCurrency(calculationResults.totalMaintenanceCost)}</div>
-        <div style="margin-bottom:8px;"><b>Total Lifetime Cost:</b> <span style="color:#009900;font-weight:700;">${formatCurrency(calculationResults.totalLifetimeCost)}</span></div>
-      `;
-    } else {
-      // Basic product info if we don't have full calculation results
-      container.innerHTML = `
-        <div style="font-weight:700;font-size:1.1em;color:#0077b6;margin-bottom:8px;letter-spacing:1px;">Lifetime Cost Calculator</div>
-        <div style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
-          <b style="flex:1;">${productData.name}</b>
-          <span style="font-weight:600;margin-left:10px;">${formatCurrency(productData.price)}</span>
-        </div>
-        ${productData.material ? `<div style="margin-bottom:8px;"><b>Material:</b> ${productData.material}</div>` : ''}
-        <div style="margin-bottom:8px;color:#666;">Calculating lifetime costs...</div>
-      `;
+  // Helper to format currency values with appropriate currency symbol
+  const formatCurrency = (value) => {
+    if (typeof value !== 'number' || isNaN(value)) {
+      console.error('Invalid value passed to formatCurrency:', value);
+      return '€0,00';
     }
-  } else {
-    // Only show empty state if we really have no product data
+    
+    // Check product type for currency formatting
+    if (productData && (productData.productType === 'car' || productData.source === 'tutti.ch')) {
+      return 'CHF ' + value.toFixed(2).replace('.', ',');
+    } else {
+      return '€' + value.toFixed(2).replace('.', ',');
+    }
+  };
+
+  // Check if we have valid product data
+  if (!productData || !productData.name) {
     container.innerHTML = `
       <div class="ltc-empty-state">
         <img src="images/icon-128.png" alt="No product" style="width:48px;display:block;margin:20px auto 10px auto;opacity:0.5;" />
         <div style="text-align:center;color:#888;font-size:1.1em;margin-bottom:10px;">No product detected on this page.</div>
-        <div style="text-align:center;color:#888;font-size:0.95em;">Navigate to a product page on zara.com or saturn.de to see lifetime cost calculations.</div>
+        <div style="text-align:center;color:#888;font-size:0.95em;">Navigate to a product page on zara.com, saturn.de, or tutti.ch to see xCost calculations.</div>
+      </div>
+    `;
+    return;
+  }
+
+  // Check if we have calculation results
+  if (!calculationResults) {
+    container.innerHTML = `
+      <div style="font-weight:700;font-size:1.1em;color:#0077b6;margin-bottom:8px;">xCost</div>
+      <div style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+        <b style="flex:1;">${productData.name}</b>
+        <span style="font-weight:600;margin-left:10px;">${formatCurrency(productData.price || 0)}</span>
+      </div>
+      <div style="margin-bottom:8px;color:#666;">Calculating xCosts...</div>
+    `;
+    return;
+  }
+
+  // Determine product type from either source
+  const productType = calculationResults.productType || productData.productType;
+  const isCar = productType === 'car' || productType === 'Car';
+  const isAppliance = ['refrigerator', 'washingMachine', 'dishwasher', 'dryer', 'appliance'].includes(productType);
+
+  let html = `<div style="font-weight:700;font-size:1.1em;color:#0077b6;margin-bottom:12px;">xCost</div>`;
+
+  if (isCar) {
+    // Car-specific display
+    html += `
+      <div class="product-info" style="margin-bottom:12px;">
+        <div class="product-name" style="font-weight:bold;font-size:16px;margin-bottom:5px;">${productData.name}</div>
+        <div style="color:#666;">${calculationResults.make || ''} ${calculationResults.model || ''}</div>
+      </div>
+      
+      <div class="car-info" style="background-color:#f5f5f5;border-radius:4px;padding:10px;margin-bottom:15px;font-size:14px;">
+        <div class="car-detail" style="margin-bottom:5px;"><strong>Year:</strong> ${calculationResults.year || 'N/A'}</div>
+        <div class="car-detail" style="margin-bottom:5px;"><strong>Mileage:</strong> ${calculationResults.mileage ? calculationResults.mileage.toLocaleString() + ' km' : 'N/A'}</div>
+        <div class="car-detail" style="margin-bottom:5px;"><strong>Fuel:</strong> ${calculationResults.fuelType || 'N/A'}</div>
+        <div class="car-detail" style="margin-bottom:5px;"><strong>Consumption:</strong> ${calculationResults.fuelConsumption ? calculationResults.fuelConsumption + ' l/100km' : 'N/A'}</div>
+      </div>
+      
+      ${calculationResults.monthlyCost ? `
+        <div class="monthly-cost" style="font-size:16px;font-weight:bold;margin-bottom:10px;color:#4CAF50;">
+          Monthly Cost: ${formatCurrency(calculationResults.monthlyCost)}
+        </div>
+      ` : ''}
+      
+      <div class="cost-summary" style="background-color:#f9f9f9;border:1px solid #eee;border-radius:4px;padding:12px;margin-bottom:15px;">
+        <div class="cost-item" style="display:flex;justify-content:space-between;margin-bottom:8px;">
+          <span>Purchase Price:</span>
+          <span>${formatCurrency(calculationResults.purchasePrice || productData.price || 0)}</span>
+        </div>
+        <div class="cost-item" style="display:flex;justify-content:space-between;margin-bottom:8px;">
+          <span>Depreciation:</span>
+          <span>${formatCurrency(calculationResults.depreciationCost || 0)}</span>
+        </div>
+        <div class="cost-item" style="display:flex;justify-content:space-between;margin-bottom:8px;">
+          <span>Fuel Cost (NPV):</span>
+          <span>${formatCurrency(calculationResults.annualFuelCost * (calculationResults.ownershipDuration || 5) || 0)}</span>
+        </div>
+        <div class="cost-item" style="display:flex;justify-content:space-between;margin-bottom:8px;">
+          <span>Insurance (NPV):</span>
+          <span>${formatCurrency(calculationResults.annualInsuranceCost * (calculationResults.ownershipDuration || 5) || 0)}</span>
+        </div>
+        <div class="cost-item" style="display:flex;justify-content:space-between;margin-bottom:8px;">
+          <span>Maintenance (NPV):</span>
+          <span>${formatCurrency(calculationResults.totalRunningCostsNPV || 0)}</span>
+        </div>
+        <div class="cost-total" style="display:flex;justify-content:space-between;font-weight:bold;padding-top:8px;border-top:1px solid #ddd;margin-top:8px;">
+          <span>Total xCost:</span>
+          <span class="highlight" style="color:#4CAF50;">${formatCurrency(calculationResults.totalLifetimeCost || 0)}</span>
+        </div>
+      </div>
+    `;
+  } else if (isAppliance) {
+    // Appliance-specific display
+    html += `
+      <div class="product-info" style="margin-bottom:12px;">
+        <div class="product-name" style="font-weight:bold;font-size:16px;margin-bottom:5px;">${productData.name}</div>
+        <div style="color:#666;">${productType ? productType.charAt(0).toUpperCase() + productType.slice(1) : 'Appliance'}</div>
+      </div>
+      
+      <div class="cost-summary" style="background-color:#f9f9f9;border:1px solid #eee;border-radius:4px;padding:12px;margin-bottom:15px;">
+        <div class="cost-item" style="display:flex;justify-content:space-between;margin-bottom:8px;">
+          <span>Purchase Price:</span>
+          <span>${formatCurrency(calculationResults.purchasePrice || productData.price || 0)}</span>
+        </div>
+        <div class="cost-item" style="display:flex;justify-content:space-between;margin-bottom:8px;">
+          <span>Energy Cost (${calculationResults.lifespan || 'N/A'} years):</span>
+          <span>${formatCurrency(calculationResults.energyCostNPV || calculationResults.annualEnergyCost * (calculationResults.lifespan || 1) || 0)}</span>
+        </div>
+        <div class="cost-item" style="display:flex;justify-content:space-between;margin-bottom:8px;">
+          <span>Maintenance Cost:</span>
+          <span>${formatCurrency(calculationResults.maintenanceCostNPV || calculationResults.totalMaintenanceCost || 0)}</span>
+        </div>
+        <div class="cost-total" style="display:flex;justify-content:space-between;font-weight:bold;padding-top:8px;border-top:1px solid #ddd;margin-top:8px;">
+          <span>Total xCost:</span>
+          <span class="highlight" style="color:#4CAF50;">${formatCurrency(calculationResults.totalLifetimeCost || 0)}</span>
+        </div>
+      </div>
+      
+      <div style="font-size:14px;color:#666;margin-bottom:12px;">
+        <div><strong>Annual Energy:</strong> ${calculationResults.annualEnergyConsumption || 'N/A'} kWh</div>
+        <div><strong>Energy Class:</strong> ${calculationResults.energyEfficiencyClass || 'N/A'}</div>
+        <div><strong>Lifespan:</strong> ${calculationResults.lifespan || 'N/A'} years</div>
+      </div>
+    `;
+  } else {
+    // Clothing and other products
+    html += `
+      <div class="product-info" style="margin-bottom:12px;">
+        <div class="product-name" style="font-weight:bold;font-size:16px;margin-bottom:5px;">${productData.name}</div>
+        <div style="color:#666;">${productType ? productType.charAt(0).toUpperCase() + productType.slice(1) : 'Product'}</div>
+      </div>
+      
+      <div style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+        <span><strong>Purchase Price:</strong></span>
+        <span style="font-weight:600;">${formatCurrency(calculationResults.purchasePrice || productData.price || 0)}</span>
+      </div>
+      
+      ${calculationResults.material ? `<div style="margin-bottom:8px;"><strong>Material:</strong> ${calculationResults.material} (${calculationResults.quality || 'N/A'} quality)</div>` : ''}
+      ${calculationResults.lifespan ? `<div style="margin-bottom:8px;"><strong>Estimated Lifespan:</strong> ${calculationResults.lifespan} years</div>` : ''}
+      ${calculationResults.annualCost ? `<div style="margin-bottom:8px;"><strong>Annualized Cost:</strong> ${formatCurrency(calculationResults.annualCost)}</div>` : ''}
+      ${calculationResults.maintenanceCostPerYear ? `<div style="margin-bottom:8px;"><strong>Maintenance per Year:</strong> ${formatCurrency(calculationResults.maintenanceCostPerYear)}</div>` : ''}
+      ${calculationResults.totalMaintenanceCost ? `<div style="margin-bottom:8px;"><strong>Total Maintenance:</strong> ${formatCurrency(calculationResults.totalMaintenanceCost)}</div>` : ''}
+      
+      <div style="margin-bottom:12px;padding:8px;background:#e3f2fd;border-radius:4px;text-align:center;">
+        <strong>Total xCost:</strong> <span style="color:#1976d2;font-weight:700;">${formatCurrency(calculationResults.totalLifetimeCost || 0)}</span>
       </div>
     `;
   }
-}
 
-// Helper to format currency
-function formatCurrency(value) {
-  if (typeof value !== 'number' || isNaN(value)) {
-    console.error('Invalid value passed to formatCurrency:', value);
-    return '€0,00'; // Default fallback
-  }
-  
-  // Check if we have product data with currency info
-  if (productData && productData.originalCurrency) {
-    const currency = productData.originalCurrency;
-    const formattedValue = value.toFixed(2).replace('.', ',');
-    
-    switch (currency) {
-      case 'CHF':
-        return 'CHF ' + formattedValue;
-      case 'USD':
-        return '$' + formattedValue;
-      case 'GBP':
-        return '£' + formattedValue;
-      case 'EUR':
-      default:
-        return '€' + formattedValue;
-    }
-  }
-  
-  // Default to EUR if no currency info available
-  return '€' + value.toFixed(2).replace('.', ',');
+  container.innerHTML = html;
 }
 
 /**
@@ -164,136 +217,6 @@ function updateStatusIndicator(isActive) {
     statusDot.className = 'status-dot status-inactive';
     statusText.textContent = 'Inactive';
   }
-}
-
-/**
- * Display product data and calculation results in the popup
- * @param {Object} productData - Product data
- * @param {Object} calculationResults - Calculation results
- */
-function displayProductData(productData, calculationResults) {
-  const contentElement = document.getElementById('content');
-  
-  // Check if this is a car
-  const isCar = productData.productType === 'car';
-  
-  // Format currency values with appropriate currency symbol
-  const formatCurrency = (value) => {
-    if (isCar) {
-      return 'CHF ' + value.toFixed(2).replace('.', ',');
-    } else {
-      return '€' + value.toFixed(2).replace('.', ',');
-    }
-  };
-  
-  // Create content HTML based on product type
-  let html = '';
-  
-  if (isCar) {
-    // Car-specific display
-    html = `
-      <div class="product-info">
-        <div class="product-name">${productData.year} ${productData.name}</div>
-        <div>${capitalizeFirstLetter(productData.carType || 'Car')}</div>
-      </div>
-      
-      <div class="car-info">
-        <div class="car-detail">Mileage: ${productData.mileage} km</div>
-        <div class="car-detail">Fuel: ${capitalizeFirstLetter(productData.fuelType || 'Unknown')}</div>
-        <div class="car-detail">Consumption: ${productData.fuelConsumption} ${productData.fuelType === 'electric' ? 'kWh/100km' : 'L/100km'}</div>
-      </div>
-      
-      <div class="monthly-cost">
-        Monthly Cost: ${formatCurrency(calculationResults.monthlyCost)}
-      </div>
-      
-      <div class="cost-summary">
-        <div class="cost-item">
-          <span>Purchase Price:</span>
-          <span>${formatCurrency(calculationResults.purchasePrice)}</span>
-        </div>
-        <div class="cost-item">
-          <span>Depreciation (${calculationResults.ownershipDuration} years):</span>
-          <span>${formatCurrency(calculationResults.depreciationCost)}</span>
-        </div>
-        <div class="cost-item">
-          <span>Fuel Cost:</span>
-          <span>${formatCurrency(calculationResults.fuelCostNPV)}</span>
-        </div>
-        <div class="cost-item">
-          <span>Insurance:</span>
-          <span>${formatCurrency(calculationResults.insuranceCostNPV)}</span>
-        </div>
-        <div class="cost-item">
-          <span>Tax:</span>
-          <span>${formatCurrency(calculationResults.taxCostNPV)}</span>
-        </div>
-        <div class="cost-item">
-          <span>Maintenance:</span>
-          <span>${formatCurrency(calculationResults.maintenanceCostNPV)}</span>
-        </div>
-        <div class="cost-total">
-          <span>Total Ownership Cost:</span>
-          <span class="highlight">${formatCurrency(calculationResults.totalOwnershipCost)}</span>
-        </div>
-      </div>
-    `;
-  } else {
-    // Appliance-specific display
-    html = `
-      <div class="product-info">
-        <div class="product-name">${productData.name}</div>
-        <div>${productData.productType ? capitalizeFirstLetter(productData.productType) : 'Appliance'}</div>
-      </div>
-      
-      <div class="cost-summary">
-        <div class="cost-item">
-          <span>Purchase Price:</span>
-          <span>${formatCurrency(calculationResults.purchasePrice)}</span>
-        </div>
-        <div class="cost-item">
-          <span>Energy Cost (${calculationResults.lifespan} years):</span>
-          <span>${formatCurrency(calculationResults.energyCostNPV)}</span>
-        </div>
-        <div class="cost-item">
-          <span>Maintenance Cost:</span>
-          <span>${formatCurrency(calculationResults.maintenanceCostNPV)}</span>
-        </div>
-        <div class="cost-total">
-          <span>Total Lifetime Cost:</span>
-          <span class="highlight">${formatCurrency(calculationResults.totalLifetimeCost)}</span>
-        </div>
-      </div>
-      
-      <div>
-        <div>Annual Energy: ${calculationResults.annualEnergyConsumption} kWh</div>
-        <div>Energy Class: ${calculationResults.energyEfficiencyClass}</div>
-      </div>
-    `;
-  }
-  
-  // Add details button (Settings button is now static in popup.html)
-  html += `
-    <button id="details-button" class="details-button">View Details</button>
-  `;
-  
-  contentElement.innerHTML = html;
-}
-
-/**
- * Display a message when no product is detected
- */
-function displayNoProductMessage() {
-  const contentElement = document.getElementById('content');
-  
-  // Settings button is now static in popup.html
-  contentElement.innerHTML = `
-    <div class="no-product">
-      <div class="no-product-icon">🔍</div>
-      <p>No product detected on this page.</p>
-      <p>Navigate to a product page on saturn.de or a car listing on tutti.ch to see lifetime cost calculations.</p>
-    </div>
-  `;
 }
 
 /**
@@ -346,86 +269,4 @@ function displaySettings(preferences) {
 function capitalizeFirstLetter(string) {
   if (!string) return '';
   return string.charAt(0).toUpperCase() + string.slice(1);
-}
-
-/**
- * Display product information and calculation results
- * @param {Object} productData - Product data
- * @param {Object} calculationResults - Calculation results
- */
-function displayProductInfo(productData, calculationResults) {
-  const infoDiv = document.getElementById('ltc-product-info');
-  const breakdownDiv = document.getElementById('ltc-cost-breakdown');
-  infoDiv.innerHTML = `<strong>Product:</strong> ${productData.name || 'N/A'}<br><strong>Price:</strong> €${productData.price || 'N/A'}`;
-  breakdownDiv.innerHTML = `<pre>${JSON.stringify(calculationResults, null, 2)}</pre>`;
-}
-
-// Function to save product data to the backend
-async function saveProductData() {
-  try {
-    // Get the current product data and calculation results
-    const response = await new Promise((resolve) => {
-      chrome.runtime.sendMessage({ type: 'GET_LAST_PRODUCT' }, resolve);
-    });
-
-    if (!response || !response.productData) {
-      throw new Error('No product data available to save');
-    }
-
-    const { productData, calculationResults } = response;
-
-    // Prepare the data for saving
-    const saveData = {
-      name: productData.name,
-      description: `Product from ${productData.source || 'unknown source'}`,
-      productType: productData.productType,
-      price: productData.price,
-      material: productData.material,
-      quality: calculationResults?.quality,
-      lifespan: calculationResults?.lifespan,
-      annualCost: calculationResults?.annualCost,
-      maintenanceCostPerYear: calculationResults?.maintenanceCostPerYear,
-      totalMaintenanceCost: calculationResults?.totalMaintenanceCost,
-      totalLifetimeCost: calculationResults?.totalLifetimeCost,
-      calculationResults: calculationResults
-    };
-
-    // Send the data to the backend
-    const result = await fetch('http://localhost:5006/api/items', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(saveData)
-    });
-
-    if (!result.ok) {
-      throw new Error('Failed to save product data');
-    }
-
-    // Show success message
-    const saveButton = document.getElementById('save-button');
-    if (saveButton) {
-      const originalText = saveButton.textContent;
-      saveButton.textContent = 'Saved!';
-      saveButton.disabled = true;
-      setTimeout(() => {
-        saveButton.textContent = originalText;
-        saveButton.disabled = false;
-      }, 2000);
-    }
-  } catch (error) {
-    console.error('Error saving product data:', error);
-    // Show error message
-    const saveButton = document.getElementById('save-button');
-    if (saveButton) {
-      const originalText = saveButton.textContent;
-      saveButton.textContent = 'Error saving!';
-      saveButton.disabled = true;
-      setTimeout(() => {
-        saveButton.textContent = originalText;
-        saveButton.disabled = false;
-      }, 2000);
-    }
-  }
 }

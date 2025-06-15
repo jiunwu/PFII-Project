@@ -1,4 +1,9 @@
-/* results_ui.js - Module for rendering lifetime cost results on product pages */
+/* results_ui.js - Module for rendering xCost results on product pages */
+
+/**
+ * Module for displaying product cost calculation results
+ * xCost calculation results on product pages
+ */
 
 /**
  * ResultsUI - A module for creating and managing the UI elements that display
@@ -15,8 +20,8 @@ class ResultsUI {
   }
 
   /**
-   * Display lifetime cost calculation results on the page
-   * @param {Object} productData - Product data
+   * Display xCost calculation results on the page
+   * @param {Object} productData - Product information
    * @param {Object} calculationResults - Calculation results
    */
   displayResults(productData, calculationResults) {
@@ -51,7 +56,7 @@ class ResultsUI {
     };
     
     // Header
-    let html = `<div class="ltc-header">Lifetime Cost Calculator</div><div class="ltc-content">`;
+    let html = `<div class="ltc-header">xCost</div><div class="ltc-content">`;
 
     // Product summary
     html += `<div class="ltc-summary">
@@ -205,8 +210,9 @@ class ResultsUI {
     // Create content
     modal.innerHTML = `
       <div class="ltc-modal-content" style="max-width:420px;min-width:320px;width:100%;box-sizing:border-box;padding:32px 28px 24px 28px;margin:0;">
+        <div class="ltc-modal-titlebar" style="cursor:pointer;font-weight:bold;font-size:1.1em;padding:14px 24px 14px 24px;user-select:none;background:#f5f7fa;border-radius:10px 10px 0 0;min-height:48px;display:flex;align-items:center;">xCost Analysis</div>
         <span class="ltc-modal-close">&times;</span>
-        <h2>Lifetime Cost Calculation Details</h2>
+        <h2>xCost Calculation Details</h2>
         
         <h3>Product Information</h3>
         <p>
@@ -228,12 +234,12 @@ class ResultsUI {
           <strong>Total Maintenance Cost (NPV):</strong> ${formatCurrency(calculationResults.maintenanceCostNPV)}
         </p>
         
-        <h3>Total Lifetime Cost</h3>
+        <h3>Total xCost</h3>
         <p>
           <strong>Purchase Price:</strong> ${formatCurrency(calculationResults.purchasePrice)}<br>
           <strong>Energy Cost (NPV):</strong> ${formatCurrency(calculationResults.energyCostNPV)}<br>
           <strong>Maintenance Cost (NPV):</strong> ${formatCurrency(calculationResults.maintenanceCostNPV)}<br>
-          <strong>Total Lifetime Cost:</strong> ${formatCurrency(calculationResults.totalLifetimeCost)}
+          <strong>Total xCost:</strong> ${formatCurrency(calculationResults.totalLifetimeCost)}
         </p>
         
         <div id="${this.chartId}" class="ltc-chart"></div>
@@ -447,7 +453,7 @@ function formatCurrency(amount, currency = 'CHF') {
   return new Intl.NumberFormat('de-CH', { style: 'currency', currency: currency }).format(amount);
 }
 
-// Display lifetime cost information on the page
+// Display xCost information on the page
 function displayLifetimeCost(productData, calculationResults) {
   // Remove any existing modal
   const existingModal = document.getElementById('lifetime-cost-modal');
@@ -491,59 +497,59 @@ function displayLifetimeCost(productData, calculationResults) {
   }, 0);
 
   // Modal content
-  let html = `<div class=\"ltc-modal-content\" style=\"max-width:420px;min-width:320px;width:100%;box-sizing:border-box;padding:32px 28px 24px 28px;margin:0;\">\n    <div class=\"ltc-header\" style=\"cursor:pointer;user-select:none;\">Lifetime Cost Calculator</div>\n    <div class=\"ltc-content\">`;
+  let html = `<div class="ltc-header" style="cursor:pointer;user-select:none;">xCost</div>\n    <div class="ltc-content">`;
 
   // Product summary
-  html += `<div class=\"ltc-summary\">
-    <div class=\"ltc-product-name\">${productData.name || productData.make + ' ' + productData.model || 'Product'}</div>
-    <div class=\"ltc-product-type\">${productData.productType ? productData.productType.charAt(0).toUpperCase() + productData.productType.slice(1) : ''}</div>
+  html += `<div class="ltc-summary">
+    <div class="ltc-product-name">${productData.name || productData.make + ' ' + productData.model || 'Product'}</div>
+    <div class="ltc-product-type">${productData.productType ? productData.productType.charAt(0).toUpperCase() + productData.productType.slice(1) : ''}</div>
   </div>`;
 
   // Total cost
-  html += `<div class=\"ltc-total\">
+  html += `<div class="ltc-total">
     Total Cost of Ownership (${calculationResults.lifespan || calculationResults.ownershipDuration || 'N/A'} years):
-    <span class=\"ltc-highlight\">${formatCurrency(calculationResults.totalLifetimeCost, calculationResults.currency || 'CHF')}</span>
+    <span class="ltc-highlight">${formatCurrency(calculationResults.totalLifetimeCost, calculationResults.currency || 'CHF')}</span>
   </div>`;
 
   // Breakdown
-  html += `<div class=\"ltc-breakdown\">
-    <div class=\"ltc-breakdown-title\">Breakdown:</div>`;
+  html += `<div class="ltc-breakdown">
+    <div class="ltc-breakdown-title">Breakdown:</div>`;
   if (productData.productType === 'car') {
     html += `
-      <div class=\"ltc-breakdown-item\">• Purchase Price: ${formatCurrency(calculationResults.purchasePrice, calculationResults.currency || 'CHF')}</div>
-      <div class=\"ltc-breakdown-item\">• Est. Annual Depreciation: ${formatCurrency(calculationResults.annualDepreciation, calculationResults.currency || 'CHF')}</div>
-      <div class=\"ltc-breakdown-item\">• Est. Resale Value: ${formatCurrency(calculationResults.estimatedResaleValue, calculationResults.currency || 'CHF')}</div>
-      <div class=\"ltc-breakdown-item\">• Est. Annual Fuel Cost: ${formatCurrency(calculationResults.annualFuelCost, calculationResults.currency || 'CHF')}</div>
-      <div class=\"ltc-breakdown-item\">• Est. Annual Insurance: ${formatCurrency(calculationResults.annualInsuranceCost, calculationResults.currency || 'CHF')}</div>
-      <div class=\"ltc-breakdown-item\">• Est. Annual Tax: ${formatCurrency(calculationResults.annualTaxCost, calculationResults.currency || 'CHF')}</div>
-      <div class=\"ltc-breakdown-item\">• Est. Annual Maintenance: ${formatCurrency(calculationResults.annualMaintenanceCost, calculationResults.currency || 'CHF')}</div>
+      <div class="ltc-breakdown-item">• Purchase Price: ${formatCurrency(calculationResults.purchasePrice, calculationResults.currency || 'CHF')}</div>
+      <div class="ltc-breakdown-item">• Est. Annual Depreciation: ${formatCurrency(calculationResults.annualDepreciation, calculationResults.currency || 'CHF')}</div>
+      <div class="ltc-breakdown-item">• Est. Resale Value: ${formatCurrency(calculationResults.estimatedResaleValue, calculationResults.currency || 'CHF')}</div>
+      <div class="ltc-breakdown-item">• Est. Annual Fuel Cost: ${formatCurrency(calculationResults.annualFuelCost, calculationResults.currency || 'CHF')}</div>
+      <div class="ltc-breakdown-item">• Est. Annual Insurance: ${formatCurrency(calculationResults.annualInsuranceCost, calculationResults.currency || 'CHF')}</div>
+      <div class="ltc-breakdown-item">• Est. Annual Tax: ${formatCurrency(calculationResults.annualTaxCost, calculationResults.currency || 'CHF')}</div>
+      <div class="ltc-breakdown-item">• Est. Annual Maintenance: ${formatCurrency(calculationResults.annualMaintenanceCost, calculationResults.currency || 'CHF')}</div>
     `;
   } else {
     html += `
-      <div class=\"ltc-breakdown-item\">• Purchase Price: ${formatCurrency(calculationResults.purchasePrice, calculationResults.currency || 'CHF')}</div>
-      <div class=\"ltc-breakdown-item\">• Energy Cost (NPV): ${formatCurrency(calculationResults.energyCostNPV, calculationResults.currency || 'CHF')}</div>
-      <div class=\"ltc-breakdown-item\">• Maintenance (NPV): ${formatCurrency(calculationResults.maintenanceCostNPV, calculationResults.currency || 'CHF')}</div>
+      <div class="ltc-breakdown-item">• Purchase Price: ${formatCurrency(calculationResults.purchasePrice, calculationResults.currency || 'CHF')}</div>
+      <div class="ltc-breakdown-item">• Energy Cost (NPV): ${formatCurrency(calculationResults.energyCostNPV, calculationResults.currency || 'CHF')}</div>
+      <div class="ltc-breakdown-item">• Maintenance (NPV): ${formatCurrency(calculationResults.maintenanceCostNPV, calculationResults.currency || 'CHF')}</div>
     `;
   }
   html += `</div>`;
 
   // Energy/vehicle info
   if (productData.productType === 'car') {
-    html += `<div class=\"ltc-energy-info\">
+    html += `<div class="ltc-energy-info">
       Fuel: ${productData.fuelType || 'N/A'}, Consumption: ${productData.fuelConsumption || 'N/A'} L or kWh/100km
       <br>Year: ${productData.year || 'N/A'}, Mileage: ${productData.mileage || 'N/A'} km
     </div>`;
   } else {
-    html += `<div class=\"ltc-energy-info\">
+    html += `<div class="ltc-energy-info">
       Annual Energy Consumption: ${calculationResults.annualEnergyConsumption} kWh<br>
       Energy Efficiency Class: ${calculationResults.energyEfficiencyClass}
     </div>`;
   }
 
   // Action buttons
-  html += `<div class=\"ltc-actions\">
-    <button class=\"ltc-details-button\">Show Calculation Details</button>
-    <button class=\"ltc-save-button\">Save This Product</button>
+  html += `<div class="ltc-actions">
+    <button class="ltc-details-button">Show Calculation Details</button>
+    <button class="ltc-save-button">Save This Product</button>
   </div>`;
 
   html += `</div></div>`;

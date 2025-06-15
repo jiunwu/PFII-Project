@@ -194,8 +194,8 @@ class ResultsUI {
    * @param {Object} calculationResults - Calculation results
    */
   showDetailsModal(productData, calculationResults) {
-    // Remove any existing modal
-    this.removeExistingModal();
+    // Clean up any existing modals first
+    cleanupAllModals();
     
     // Create modal
     const modal = document.createElement('div');
@@ -453,11 +453,91 @@ function formatCurrency(amount, currency = 'CHF') {
   return new Intl.NumberFormat('de-CH', { style: 'currency', currency: currency }).format(amount);
 }
 
+// Function to clean up all existing modals
+function cleanupAllModals() {
+  const existingModals = document.querySelectorAll('.ltc-modal');
+  existingModals.forEach(modal => {
+    console.log('Removing existing modal from results_ui:', modal);
+    modal.remove();
+  });
+}
+
+// Clean up modals when page is about to unload
+window.addEventListener('beforeunload', cleanupAllModals);
+
+// Enhanced URL change detection with cleanup
+let currentPageURL = window.location.href;
+let cleanupTimeout = null;
+
+function handlePageURLChange() {
+  const newURL = window.location.href;
+  if (newURL !== currentPageURL) {
+    console.log('URL changed in results_ui from', currentPageURL, 'to', newURL);
+    currentPageURL = newURL;
+    
+    // Clean up modals immediately on URL change
+    cleanupAllModals();
+    
+    // Clear any pending cleanup
+    if (cleanupTimeout) {
+      clearTimeout(cleanupTimeout);
+    }
+  }
+}
+
+// Check for URL changes every 500ms (more responsive)
+setInterval(handlePageURLChange, 500);
+
+// Also listen for popstate events (browser back/forward)
+window.addEventListener('popstate', () => {
+  console.log('Popstate event detected in results_ui, cleaning up modals');
+  cleanupAllModals();
+});
+
+// Listen for pushstate/replacestate (programmatic navigation)
+const originalPushStateResults = history.pushState;
+const originalReplaceStateResults = history.replaceState;
+
+history.pushState = function() {
+  originalPushStateResults.apply(history, arguments);
+  console.log('PushState detected in results_ui, cleaning up modals');
+  cleanupAllModals();
+};
+
+history.replaceState = function() {
+  originalReplaceStateResults.apply(history, arguments);
+  console.log('ReplaceState detected in results_ui, cleaning up modals');
+  cleanupAllModals();
+};
+
+// Also listen for hashchange events
+window.addEventListener('hashchange', () => {
+  console.log('Hash change detected in results_ui, cleaning up modals');
+  cleanupAllModals();
+});
+
+// Listen for focus events (when user returns to tab)
+window.addEventListener('focus', () => {
+  // Small delay to check if we're on a different page
+  setTimeout(() => {
+    handlePageURLChange();
+  }, 100);
+});
+
+// Listen for visibility change (when tab becomes visible)
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) {
+    // Tab became visible, check for URL changes
+    setTimeout(() => {
+      handlePageURLChange();
+    }, 100);
+  }
+});
+
 // Display xCost information on the page
 function displayLifetimeCost(productData, calculationResults) {
-  // Remove any existing modal
-  const existingModal = document.getElementById('lifetime-cost-modal');
-  if (existingModal) existingModal.remove();
+  // Clean up any existing modals first
+  cleanupAllModals();
 
   // Format currency
   const formatCurrency = (amount, currency = 'CHF') =>

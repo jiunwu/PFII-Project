@@ -17,21 +17,122 @@ function cleanupExistingModals() {
 // Clean up modals when page is about to unload
 window.addEventListener('beforeunload', cleanupExistingModals);
 
-// Clean up modals when the page URL changes (for SPA navigation)
+// Enhanced URL change detection with reinitialization
 let currentURL = window.location.href;
-setInterval(() => {
-  if (window.location.href !== currentURL) {
-    console.log('URL changed from', currentURL, 'to', window.location.href);
-    currentURL = window.location.href;
+let initializationTimeout = null;
+
+function handleURLChange() {
+  const newURL = window.location.href;
+  if (newURL !== currentURL) {
+    console.log('URL changed from', currentURL, 'to', newURL);
+    currentURL = newURL;
+    
+    // Clean up existing modals first
     cleanupExistingModals();
+    
+    // Clear any pending initialization
+    if (initializationTimeout) {
+      clearTimeout(initializationTimeout);
+    }
+    
+    // Reinitialize after a short delay to allow the new page content to load
+    initializationTimeout = setTimeout(() => {
+      console.log('Reinitializing after URL change...');
+      initLifetimeCostCalculator();
+    }, 1500); // 1.5 second delay to allow content to load
   }
-}, 1000);
+}
+
+// Check for URL changes every second
+setInterval(handleURLChange, 1000);
 
 // Also listen for popstate events (browser back/forward)
 window.addEventListener('popstate', () => {
-  console.log('Popstate event detected, cleaning up modals');
+  console.log('Popstate event detected, cleaning up modals and reinitializing');
   cleanupExistingModals();
+  
+  // Clear any pending initialization
+  if (initializationTimeout) {
+    clearTimeout(initializationTimeout);
+  }
+  
+  // Reinitialize after a short delay
+  initializationTimeout = setTimeout(() => {
+    console.log('Reinitializing after popstate...');
+    initLifetimeCostCalculator();
+  }, 1500);
 });
+
+// Listen for pushstate/replacestate (programmatic navigation)
+const originalPushState = history.pushState;
+const originalReplaceState = history.replaceState;
+
+history.pushState = function() {
+  originalPushState.apply(history, arguments);
+  console.log('PushState detected, triggering reinitialization');
+  handleURLChange();
+};
+
+history.replaceState = function() {
+  originalReplaceState.apply(history, arguments);
+  console.log('ReplaceState detected, triggering reinitialization');
+  handleURLChange();
+};
+
+// Also listen for hashchange events
+window.addEventListener('hashchange', () => {
+  console.log('Hash change detected, triggering reinitialization');
+  handleURLChange();
+});
+
+// Listen for DOM mutations that might indicate new content has loaded
+let mutationObserver = null;
+
+function setupMutationObserver() {
+  if (mutationObserver) {
+    mutationObserver.disconnect();
+  }
+  
+  mutationObserver = new MutationObserver((mutations) => {
+    let significantChange = false;
+    
+    mutations.forEach((mutation) => {
+      // Check if significant content has been added
+      if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+        mutation.addedNodes.forEach((node) => {
+          if (node.nodeType === 1 && // Element node
+              (node.classList?.contains('product') || 
+               node.querySelector?.('.product') ||
+               node.classList?.contains('price') ||
+               node.querySelector?.('.price'))) {
+            significantChange = true;
+          }
+        });
+      }
+    });
+    
+    if (significantChange) {
+      console.log('Significant DOM change detected, checking for reinitialization');
+      
+      // Clear any pending initialization
+      if (initializationTimeout) {
+        clearTimeout(initializationTimeout);
+      }
+      
+      // Reinitialize after a short delay
+      initializationTimeout = setTimeout(() => {
+        console.log('Reinitializing after DOM change...');
+        initLifetimeCostCalculator();
+      }, 2000); // 2 second delay for DOM changes
+    }
+  });
+  
+  // Start observing
+  mutationObserver.observe(document.body, {
+    childList: true,
+    subtree: true
+  });
+}
 
 // Save product to backend API
 async function saveProduct(productData, calculationResults) {
@@ -164,8 +265,12 @@ async function saveProduct(productData, calculationResults) {
 // Ensure the content script is initialized (robust for all page states)
 if (document.readyState === 'complete' || document.readyState === 'interactive') {
   initLifetimeCostCalculator();
+  setupMutationObserver();
 } else {
-  window.addEventListener('DOMContentLoaded', initLifetimeCostCalculator);
+  window.addEventListener('DOMContentLoaded', () => {
+    initLifetimeCostCalculator();
+    setupMutationObserver();
+  });
 }
 
 // Main function to initialize the content script
